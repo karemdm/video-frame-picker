@@ -1,84 +1,72 @@
-# Aplicativo de Reprodução de Vídeo
+# video-frame-picker
 
-Este é um reprodutor de vídeo em Python construído com Tkinter e OpenCV que permite carregar, visualizar e interagir com arquivos de vídeo. O player oferece navegação quadro a quadro, intervalos de pulo personalizados, salvamento de quadros como imagens e redimensionamento dinâmico da tela de vídeo com base nas dimensões da tela.
+Two small desktop tools (Tkinter + OpenCV + Pillow) for building image datasets by hand:
 
-## Funcionalidades
+| Script | What it does |
+|---|---|
+| `video_frame_picker.py` | Opens a video, lets you jump through frames with the keyboard, mouse wheel or scrollbar, and saves the frames you choose as JPG. |
+| `image_picker.py` | Opens a folder of images, lets you browse them and copies the ones you choose to an `output_<folder>` directory. |
 
-- **Navegação por Quadro**: Avance ou retroceda pelos quadros com intervalos de pulo personalizáveis usando as setas do teclado.
-- **Salvar Quadros**: Capture e salve o quadro atual como uma imagem.
-- **Redimensionamento Dinâmico**: A tela do vídeo se redimensiona proporcionalmente de acordo com o tamanho da tela.
-- **Navegação por Barra de Rolagem**: Navegue pelos quadros usando uma barra de rolagem com controles de clique, rolagem e arraste.
-- **Controle por Mouse e Teclado**: Controle a navegação de quadros com atalhos de mouse e teclado.
-- **Abrir Novo Vídeo**: Carregue um vídeo diferente diretamente pelo reprodutor.
+## Installation
 
-## Instalação
-
-### Pré-requisitos
-
-- Python 3.x
-
-### Criar um Ambiente Virtual
-
-Para isolar as dependências do projeto, é recomendável criar um ambiente virtual. Execute os seguintes comandos no terminal:
+Requires Python 3.8+ (Tkinter is included in the standard Python installers for Windows and macOS; on Linux install `python3-tk`).
 
 ```bash
-# Navegue até o diretório do seu projeto
-cd /caminho/para/seu/projeto
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
 
-# Crie um ambiente virtual chamado 'venv'
-python -m venv venv
-
-# Ative o ambiente virtual (Windows)
-venv\Scripts\activate
-
-# Ative o ambiente virtual (macOS/Linux)
-source venv/bin/activate
-
-# Instalação das Dependências
-# Após ativar o ambiente virtual, execute o seguinte comando para instalar as bibliotecas necessárias:
 pip install -r requirements.txt
 ```
 
-## Inicialização
+## video_frame_picker.py
 
-Execute o script para abrir o reprodutor de vídeo. Você será solicitado a escolher um arquivo de vídeo para reprodução.
+```bash
+python video_frame_picker.py
+```
 
-## Controles de Navegação
+A file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`).
 
-- **Seta Direita**: Avança 40 quadros para frente.
-- **Seta Esquerda**: Retrocede 20 quadros.
-- **Seta para Cima**: Avança 200 quadros.
-- **Seta para Baixo**: Retrocede 100 quadros.
-- **Espaço ou ‘S’**: Salva o quadro atual como uma imagem.
-- **Navegação por Barra de Rolagem**: Use a barra de rolagem na parte inferior para avançar ou retroceder no vídeo.
-- **Abrir Novo Vídeo**: Use o botão “Abrir Novo Vídeo” para carregar um arquivo de vídeo diferente.
+| Key / control | Action |
+|---|---|
+| `→` | forward 40 frames |
+| `←` | back 20 frames |
+| `↓` | forward 200 frames |
+| `↑` | back 100 frames |
+| Mouse wheel | jump 800 frames |
+| Scrollbar | seek anywhere in the video |
+| `Space`, `Enter` or `S` | save frame |
+| `Q` | quit |
+| **Abrir Novo Vídeo** button | open another video |
 
-## Salvando Quadros
+Frames are saved in the **current working directory** as
+`<video name without accents>_frame_<n>.jpg`.
 
-Os quadros são salvos no mesmo diretório do vídeo com um nome baseado no nome do arquivo original, com o número do quadro adicionado ao final.
+## image_picker.py
 
-## Comandos de Teclado
+```bash
+python image_picker.py
+```
 
-- **Seta Direita**: Avança para o próximo quadro.
-- **Seta Esquerda**: Retrocede para o quadro anterior.
-- **Espaço ou ‘S’**: Salva o quadro atual.
-- **‘Q’**: Encerra o reprodutor.
+A folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`).
+Selected images are copied to `output_<folder name>` next to the input folder.
 
-## Estrutura do Código
+| Key / button | Action |
+|---|---|
+| `→` / **Next** | next image |
+| `←` / **Back** | previous image |
+| `↓` / **Next 10** | forward 10 images |
+| `↑` / **Back 10** | back 10 images |
+| `Space`, `Enter` / **Save** | copy image to the output folder and go to the next one |
+| **Open Image Folder** | choose another folder |
 
-A seguir está uma visão geral das principais classes e métodos:
+## Known limitations
 
-- **Classe VideoPlayer**: Classe principal que gerencia a reprodução do vídeo.
-  - `__init__`: Inicializa o reprodutor, configura a interface e os eventos.
-  - `next_frame` e `previous_frame`: Navegação de quadros para frente e para trás.
-  - `save_current_frame`: Salva o quadro atual como uma imagem.
-  - `update_display`: Atualiza a tela com o quadro atual.
-  - `scroll_video`: Controla a barra de rolagem para a navegação de quadros.
+- The interface labels are partly in Portuguese.
+- `video_frame_picker.py` reads the frame *after* the one on screen when saving, so the saved image can be one frame ahead of the preview.
 
-## Exemplo de Uso
+## License
 
-Para iniciar o reprodutor de vídeo, execute o código abaixo:
-
-```python
-if __name__ == "__main__":
-    main()
+[MIT](LICENSE)
