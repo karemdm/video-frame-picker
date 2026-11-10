@@ -20,20 +20,20 @@ class ImageViewer:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
-        # Label para exibir a imagem
+        # Label that shows the image
         self.image_label = tk.Label(root)
-        self.image_label.pack(pady=20)  # margem entre a imagem e os botões
+        self.image_label.pack(pady=20)  # space between the image and the buttons
 
-        # Label para mostrar o nome da imagem abaixo da imagem
+        # Label with the image file name, below the image
         self.image_name_label = tk.Label(root, text="", anchor="w", font=("Arial", 10, "bold"))
         self.image_name_label.pack(anchor="w", padx=10, pady=5)
 
         self.create_buttons()
         self.show_image(self.current_index)
 
-        # Usa bind_all para capturar todos os eventos de teclado
+        # bind_all captures every key event
         self.root.bind_all("<Key>", self.key_pressed)
-        self.root.focus_force()  # força o foco na janela
+        self.root.focus_force()  # force focus on the window
 
     def key_pressed(self, event):
         if event.keysym == "Up":
@@ -48,7 +48,7 @@ class ImageViewer:
             self.skip_10_images(event)
 
     def create_buttons(self):
-        # Frame para os botões
+        # Frame for the buttons
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10, padx=10)
 
@@ -83,21 +83,28 @@ class ImageViewer:
         self.skip_10_button.grid(row=0, column=4, padx=5)
 
     def show_image(self, index):
+        if not self.images:
+            self.image_label.config(image="")
+            self.image_label.image = None
+            self.image_name_label.config(text=f"No images found in: {self.input_folder}")
+            return
         img_path = os.path.join(self.input_folder, self.images[index])
         img = Image.open(img_path)
-        img = img.resize((600, 400))  # ajuste de tamanho
+        img = img.resize((600, 400))  # fixed preview size
         img_tk = ImageTk.PhotoImage(img)
         self.image_label.config(image=img_tk)
         self.image_label.image = img_tk
 
-        # Atualiza o nome da imagem
-        self.image_name_label.config(text=f"Imagem: {self.images[index]}")
+        # Update the image name
+        self.image_name_label.config(text=f"Image: {self.images[index]}")
 
     def save_image(self, event=None):
+        if not self.images:
+            return
         img_path = os.path.join(self.input_folder, self.images[self.current_index])
         output_img_path = os.path.join(self.output_folder, f"output_{self.images[self.current_index]}")
         shutil.copy(img_path, output_img_path)
-        print(f"Imagem salva: {output_img_path}")
+        print(f"Image saved: {output_img_path}")
         self.next_image()
 
     def next_image(self, event=None):
@@ -105,20 +112,20 @@ class ImageViewer:
             self.current_index += 1
             self.show_image(self.current_index)
         else:
-            print("Já está na última imagem.")
+            print("Already at the last image.")
 
     def back_image(self, event=None):
         if self.current_index > 0:
             self.current_index -= 1
             self.show_image(self.current_index)
         else:
-            print("Já está na primeira imagem.")
+            print("Already at the first image.")
 
     def skip_10_images(self, event=None):
         if self.current_index + skip < len(self.images):
             self.current_index += skip
         else:
-            self.current_index = len(self.images) - 1
+            self.current_index = max(len(self.images) - 1, 0)
         self.show_image(self.current_index)
 
     def back_10_images(self, event=None):
@@ -129,7 +136,7 @@ class ImageViewer:
         self.show_image(self.current_index)
 
     def open_folder(self):
-        new_folder = filedialog.askdirectory(title="Selecione a nova pasta de imagens")
+        new_folder = filedialog.askdirectory(title="Select a new image folder")
         if new_folder:
             self.input_folder = new_folder
             self.output_folder = os.path.join(
@@ -146,15 +153,15 @@ class ImageViewer:
             self.show_image(self.current_index)
 
 def select_folder():
-    return filedialog.askdirectory(title="Selecione a pasta de imagens")
+    return filedialog.askdirectory(title="Select an image folder")
 
 def main():
     root = tk.Tk()
-    root.title("Visualizador de Imagens")
+    root.title("Image Picker")
 
     input_folder = select_folder()
     if not input_folder:
-        print("Pasta de entrada não selecionada.")
+        print("No input folder selected.")
         return
 
     output_folder = os.path.join(
@@ -164,7 +171,7 @@ def main():
 
     viewer = ImageViewer(root, input_folder, output_folder)
 
-    # Botão "Open Image Folder" no canto superior esquerdo, acima da imagem
+    # "Open Image Folder" button (packed after the viewer, so it appears below it)
     open_button = tk.Button(
         root, text="Open Image Folder", command=viewer.open_folder,
         width=20, height=2, borderwidth=1, relief="solid"

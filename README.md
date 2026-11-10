@@ -35,14 +35,14 @@ A file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`).
 | `←` | back 20 frames |
 | `↓` | forward 200 frames |
 | `↑` | back 100 frames |
-| Mouse wheel | jump 800 frames |
+| Mouse wheel (over the video) | down: forward 800 frames, up: back 800 frames |
 | Scrollbar | seek anywhere in the video |
-| `Space`, `Enter` or `S` | save frame |
+| `Space`, `Enter`, `S` or **Save Frame** button | save the frame on screen |
 | `Q` | quit |
-| **Abrir Novo Vídeo** button | open another video |
+| **Open New Video** button | open another video |
 
 Frames are saved in the **current working directory** as
-`<video name without accents>_frame_<n>.jpg`.
+`<video name without accents>_frame_<n>.jpg` (`<n>` = 0-based frame index).
 
 ## image_picker.py
 
@@ -64,8 +64,9 @@ Selected images are copied to `output_<folder name>` next to the input folder.
 
 ## Known limitations
 
-- The interface labels are partly in Portuguese.
-- `video_frame_picker.py` reads the frame *after* the one on screen when saving, so the saved image can be one frame ahead of the preview.
+- Frame steps (40 / 200 / 800) are hard-coded in `VideoPlayer.__init__`.
+- The preview size is computed from the first video; a video opened later with **Open New Video** is shown at that same size.
+- `image_picker.py` shows every image at a fixed 600x400 preview (aspect ratio not preserved; the copied file is untouched).
 
 ## License
 

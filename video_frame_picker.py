@@ -2,7 +2,6 @@ import cv2
 import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk
-import ctypes
 import os
 from unidecode import unidecode
 
@@ -17,6 +16,7 @@ class VideoPlayer:
         self.skip_frames = 40  # Number of frames to skip when using keyboard or mouse
         self.skip_frames_2 = 200
         self.frame_skip_amount = 0
+        self.displayed_frame = None  # last frame shown on the canvas (BGR, full size)
 
         self.root = tk.Tk()
         self.root.title(name_video)
@@ -37,41 +37,29 @@ class VideoPlayer:
         self.scrollbar = ttk.Scrollbar(self.root, orient="horizontal", command=self.scroll_video)
         self.scrollbar.pack(fill="x")
 
-        # # Create a button to save the current frame
-        # self.save_button = tk.Button(self.root, text="Salvar Frame", command=self.save_current_frame)
-        # self.save_button.pack(pady=10)
-        # # self.save_button.pack(side="left", padx=10)
-
-        # # Create a button to open a new video
-        # self.open_button = tk.Button(self.root, text="Abrir Novo Vídeo", command=self.open_new_video)
-        # self.open_button.pack(side="left", padx=10)
-
         # Create a frame for the buttons
         self.button_frame = tk.Frame(self.root)
         self.button_frame.pack(pady=10)
 
         # Create a button to save the current frame
-        self.save_button = tk.Button(self.button_frame, text="Salvar Frame", command=self.save_current_frame)
+        self.save_button = tk.Button(self.button_frame, text="Save Frame", command=self.save_current_frame)
         self.save_button.pack(side="left", padx=10)
 
         # Create a button to open a new video
-        self.open_button = tk.Button(self.button_frame, text="Abrir Novo Vídeo", command=self.open_new_video)
+        self.open_button = tk.Button(self.button_frame, text="Open New Video", command=self.open_new_video)
         self.open_button.pack(side="left", padx=10)
 
         # Read the first frame
         ret, frame = self.cap.read()
         if ret:
-            # Ajustar as dimensões do frame para manter a proporção original do vídeo
+            # Fit the display size to the video's aspect ratio
             frame_ratio = frame.shape[1] / frame.shape[0]
             window_ratio = screen_width / screen_height
-            # window_ratio = self.root.winfo_screenwidth() / self.root.winfo_screenheight()
 
             if frame_ratio > window_ratio:
-                # self.frame_width = int(self.root.winfo_screenwidth() * 0.8)
                 self.frame_width = int(screen_width * 0.8)
                 self.frame_height = int(self.frame_width / frame_ratio)
             else:
-                # self.frame_height = int(self.root.winfo_screenheight() * 0.6)
                 self.frame_height = int(screen_height * 0.6)
                 self.frame_width = int(self.frame_height * frame_ratio)
 
@@ -87,29 +75,16 @@ class VideoPlayer:
         self.root.bind("<q>", self.quit)
 
         # Bind mouse events
-        self.canvas.bind("<Button-4>", self.scroll_up)  # Scroll up event (Linux and Windows)
-        self.canvas.bind("<Button-5>", self.scroll_down)  # Scroll down event (Linux and Windows)
-        self.canvas.bind("<MouseWheel>", self.scroll_mouse_wheel)  # Scroll event (Mac)
+        self.canvas.bind("<Button-4>", self.scroll_up)  # Wheel up (Linux/X11)
+        self.canvas.bind("<Button-5>", self.scroll_down)  # Wheel down (Linux/X11)
+        self.canvas.bind("<MouseWheel>", self.scroll_mouse_wheel)  # Wheel (Windows/macOS)
         self.scrollbar.bind("<Button-1>", self.start_scroll)
         self.scrollbar.bind("<B1-Motion>", self.move_scroll)
         self.scrollbar.bind("<ButtonRelease-1>", self.stop_scroll)
-        # self.canvas.bind("<Button-1>", self.focus_canvas)
-        # self.scrollbar.bind("<ButtonRelease-1>", self.handle_slider_click)
         self.root.bind("<Key>", self.key_pressed)
 
         self.update_display()
         self.root.mainloop()
-
-    # def handle_slider_click(self, event):
-    #     slider_position = self.scrollbar.get()[0]
-    #     new_frame = int(slider_position * (self.total_frames - 1))
-    #     if new_frame != self.current_frame:
-    #         self.current_frame = new_frame
-    #         self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
-    #         self.update_display()
-
-    # def focus_canvas(self, event):
-    #     self.canvas.focus_set()
 
     def key_pressed(self, event):
         if event.keysym == "Right":
@@ -131,6 +106,8 @@ class VideoPlayer:
         ret, frame = self.cap.read()
 
         if ret:
+            # Keep the full-size frame so "save" writes exactly what is on screen
+            self.displayed_frame = frame
             # Resize the frame to fit the display
             resized_frame = cv2.resize(frame, (self.frame_width, self.frame_height))
 
@@ -157,7 +134,7 @@ class VideoPlayer:
     def previous_frame(self, event=None):
         # Move to the previous frame
         if self.current_frame > 0:
-            self.current_frame = max(self.current_frame - (self.skip_frames) / 2, 0)
+            self.current_frame = max(self.current_frame - self.skip_frames // 2, 0)
             self.update_display()
 
     def skip_forward(self):
@@ -165,29 +142,19 @@ class VideoPlayer:
         self.update_display()
 
     def skip_backward(self):
-        self.current_frame = max(self.current_frame - (self.skip_frames_2 / 2), 0)
+        self.current_frame = max(self.current_frame - self.skip_frames_2 // 2, 0)
         self.update_display()
 
     def save_current_frame(self, event=None):
-        frame = self.get_current_canvas_frame()
+        # Save the frame currently on screen (not cap.read(), which would return the next frame)
+        frame = self.displayed_frame
         if frame is not None:
-            nome_arquivo_sem_extensao, extensao = os.path.splitext(self.name_video)
-            nome_arquivo_sem_acentos = unidecode(nome_arquivo_sem_extensao)
+            base_name, _ = os.path.splitext(self.name_video)
+            base_name = unidecode(base_name)
 
-            filename = nome_arquivo_sem_acentos + f"_frame_{self.current_frame}.jpg"
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            filename = base_name + f"_frame_{self.current_frame}.jpg"
             cv2.imwrite(filename, frame)
             print(f"Frame {self.current_frame} saved as {filename}")
-
-
-    def get_current_canvas_frame(self):
-        # Read the current frame from the original video capture
-        frame = None
-        if self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        return frame
 
     def scroll_video(self, *args):
         # Get the current scrollbar position
@@ -204,19 +171,19 @@ class VideoPlayer:
 
 
     def scroll_up(self, event=None):
-        # Scroll up event (Linux and Windows)
+        # Wheel up: go back
         self.current_frame = max(0, self.current_frame - self.skip_frames_2 * 4)
         self.update_display()
         self.update_scrollbar()
 
     def scroll_down(self, event=None):
-        # Scroll down event (Linux and Windows)
+        # Wheel down: go forward
         self.current_frame = min(self.total_frames - 1, self.current_frame + self.skip_frames_2 * 4)
         self.update_display()
         self.update_scrollbar()
 
     def scroll_mouse_wheel(self, event=None):
-        # Scroll event (Mac)
+        # Windows/macOS wheel event
         if event.delta > 0:
             self.scroll_up()
         else:
@@ -242,7 +209,7 @@ class VideoPlayer:
 
     def update_scrollbar(self):
         # Update the scrollbar position based on the current frame
-        position = self.current_frame / (self.total_frames - 1)
+        position = self.current_frame / max(self.total_frames - 1, 1)
         self.scrollbar.set(position, position)
 
     def quit(self, event=None):
@@ -253,13 +220,14 @@ class VideoPlayer:
 
     def open_new_video(self):
         # Open file dialog to choose a new video
-        filetypes = [("Arquivos de vídeo", "*.mov;*.mp4;*.avi;*.3gp")]
-        video_path = filedialog.askopenfilename(title="Escolher vídeo", filetypes=filetypes)
+        filetypes = [("Video files", "*.mov;*.mp4;*.avi;*.3gp")]
+        video_path = filedialog.askopenfilename(title="Choose a video", filetypes=filetypes)
         if video_path:
             self.cap.release()  # Release the current video capture
             self.cap = cv2.VideoCapture(video_path)  # Open the new video
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.current_frame = 0
+            self.displayed_frame = None
             self.name_video = os.path.basename(video_path)
             self.update_display()
 
@@ -268,21 +236,15 @@ class VideoPlayer:
 
 
 def main():
-    # Abrir janela de diálogo para escolher o vídeo
+    # Ask for a video with a file dialog
     root = tk.Tk()
-    root.withdraw()  # Ocultar janela principal
-    filetypes = [("Arquivos de vídeo", "*.mov;*.mp4;*.avi;*.3gp")]
-    video_path = filedialog.askopenfilename(title="Escolher vídeo", filetypes=filetypes)
-    root.destroy()  # Fechar a janela de diálogo
+    root.withdraw()  # hide the helper window
+    filetypes = [("Video files", "*.mov;*.mp4;*.avi;*.3gp")]
+    video_path = filedialog.askopenfilename(title="Choose a video", filetypes=filetypes)
+    root.destroy()
 
-    # Verificar se o usuário selecionou um vídeo
     if video_path:
-         # Obter o diretório do vídeo a partir do caminho
-        video_dir = os.path.dirname(video_path)
-        # Obter o nome do vídeo a partir do caminho
-        video_filename = os.path.basename(video_path)
-        # Criar uma instância do player de vídeo
-        player = VideoPlayer(video_path, video_filename)
+        VideoPlayer(video_path, os.path.basename(video_path))
 
 if __name__ == "__main__":
     main()
