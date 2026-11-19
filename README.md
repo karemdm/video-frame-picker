@@ -40,10 +40,10 @@ If PowerShell blocks the activation script, run `Set-ExecutionPolicy -Scope Proc
 ## video_frame_picker.py
 
 ```bash
-python video_frame_picker.py
+python video_frame_picker.py [VIDEO] [--out DIR]
 ```
 
-A file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`).
+Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`). Pass a `VIDEO` path to skip the dialog and `--out DIR` to choose the folder for the saved frames (created if missing).
 
 | Key / control | Action |
 |---|---|
@@ -57,17 +57,19 @@ A file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`).
 | `Q` | quit |
 | **Open New Video** button | open another video |
 
-Frames are saved in the **current working directory** as
+Frames are saved in `--out DIR` (default: the **current working directory**) as
 `<video name without accents>_frame_<n>.jpg` (`<n>` = 0-based frame index).
+A status line under the buttons confirms each save, e.g. `Saved abbey_frame_120.jpg (3 saved)`.
 
 ## image_picker.py
 
 ```bash
-python image_picker.py
+python image_picker.py [FOLDER] [--out DIR]
 ```
 
-A folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`).
-Selected images are copied to `output_<folder name>` next to the input folder.
+Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`); pass `FOLDER` to skip it.
+Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder.
+A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 | Key / button | Action |
 |---|---|

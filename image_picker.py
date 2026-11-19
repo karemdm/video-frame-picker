@@ -1,3 +1,4 @@
+import argparse
 import os
 import shutil
 import tkinter as tk
@@ -7,10 +8,11 @@ from PIL import Image, ImageTk
 skip = 10
 
 class ImageViewer:
-    def __init__(self, root, input_folder, output_folder):
+    def __init__(self, root, input_folder, output_folder, custom_output=False):
         self.root = root
         self.input_folder = input_folder
         self.output_folder = output_folder
+        self.custom_output = custom_output  # --out given: keep it when opening another folder
         self.images = sorted([
             f for f in os.listdir(input_folder)
             if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))
@@ -27,6 +29,11 @@ class ImageViewer:
         # Label with the image file name, below the image
         self.image_name_label = tk.Label(root, text="", anchor="w", font=("Arial", 10, "bold"))
         self.image_name_label.pack(anchor="w", padx=10, pady=5)
+
+        # Status line (shows the result of the last save)
+        self.status_label = tk.Label(root, text="", anchor="w")
+        self.status_label.pack(anchor="w", padx=10)
+        self.saved_count = 0
 
         self.create_buttons()
         self.show_image(self.current_index)
@@ -104,6 +111,9 @@ class ImageViewer:
         img_path = os.path.join(self.input_folder, self.images[self.current_index])
         output_img_path = os.path.join(self.output_folder, f"output_{self.images[self.current_index]}")
         shutil.copy(img_path, output_img_path)
+        self.saved_count += 1
+        self.status_label.config(
+            text=f"Saved output_{self.images[self.current_index]} ({self.saved_count} saved)")
         print(f"Image saved: {output_img_path}")
         self.next_image()
 
@@ -139,10 +149,11 @@ class ImageViewer:
         new_folder = filedialog.askdirectory(title="Select a new image folder")
         if new_folder:
             self.input_folder = new_folder
-            self.output_folder = os.path.join(
-                os.path.dirname(new_folder),
-                f"output_{os.path.basename(new_folder)}"
-            )
+            if not self.custom_output:
+                self.output_folder = os.path.join(
+                    os.path.dirname(new_folder),
+                    f"output_{os.path.basename(new_folder)}"
+                )
             if not os.path.exists(self.output_folder):
                 os.makedirs(self.output_folder)
             self.images = sorted([
@@ -155,21 +166,37 @@ class ImageViewer:
 def select_folder():
     return filedialog.askdirectory(title="Select an image folder")
 
-def main():
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Browse a folder of images and copy the ones you choose to an output folder.")
+    parser.add_argument("folder", nargs="?",
+                        help="image folder to open (a folder dialog is shown if omitted)")
+    parser.add_argument("--out", metavar="DIR",
+                        help="output folder (default: output_<folder> next to the input folder)")
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
     root = tk.Tk()
     root.title("Image Picker")
 
-    input_folder = select_folder()
+    input_folder = args.folder
+    if input_folder and not os.path.isdir(input_folder):
+        raise SystemExit(f"Folder not found: {input_folder}")
+    if not input_folder:
+        input_folder = select_folder()
     if not input_folder:
         print("No input folder selected.")
         return
+    input_folder = os.path.normpath(input_folder)
 
-    output_folder = os.path.join(
+    output_folder = args.out or os.path.join(
         os.path.dirname(input_folder),
         f"output_{os.path.basename(input_folder)}"
     )
 
-    viewer = ImageViewer(root, input_folder, output_folder)
+    viewer = ImageViewer(root, input_folder, output_folder, custom_output=bool(args.out))
 
     # "Open Image Folder" button (packed after the viewer, so it appears below it)
     open_button = tk.Button(

@@ -1,3 +1,4 @@
+import argparse
 import cv2
 import tkinter as tk
 from tkinter import ttk, filedialog
@@ -6,9 +7,10 @@ import os
 from unidecode import unidecode
 
 class VideoPlayer:
-    def __init__(self, video_path, name_video):
+    def __init__(self, video_path, name_video, out_dir=None):
         self.video_path = video_path
         self.name_video = name_video
+        self.out_dir = out_dir or os.getcwd()  # where saved frames go
         self.cap = cv2.VideoCapture(video_path)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -48,6 +50,12 @@ class VideoPlayer:
         # Create a button to open a new video
         self.open_button = tk.Button(self.button_frame, text="Open New Video", command=self.open_new_video)
         self.open_button.pack(side="left", padx=10)
+
+        # Status line (shows the result of the last save)
+        self.status_var = tk.StringVar(value="")
+        self.status_label = tk.Label(self.root, textvariable=self.status_var, anchor="w")
+        self.status_label.pack(fill="x", padx=10, pady=(0, 8))
+        self.saved_count = 0
 
         # Read the first frame
         ret, frame = self.cap.read()
@@ -153,8 +161,13 @@ class VideoPlayer:
             base_name = unidecode(base_name)
 
             filename = base_name + f"_frame_{self.current_frame}.jpg"
-            cv2.imwrite(filename, frame)
-            print(f"Frame {self.current_frame} saved as {filename}")
+            os.makedirs(self.out_dir, exist_ok=True)
+            if cv2.imwrite(os.path.join(self.out_dir, filename), frame):
+                self.saved_count += 1
+                self.status_var.set(f"Saved {filename} ({self.saved_count} saved)")
+                print(f"Frame {self.current_frame} saved as {filename}")
+            else:
+                self.status_var.set(f"Could not save {filename}")
 
     def scroll_video(self, *args):
         # Get the current scrollbar position
@@ -235,16 +248,31 @@ class VideoPlayer:
             self.root.title(self.name_video)
 
 
-def main():
-    # Ask for a video with a file dialog
-    root = tk.Tk()
-    root.withdraw()  # hide the helper window
-    filetypes = [("Video files", "*.mov;*.mp4;*.avi;*.3gp")]
-    video_path = filedialog.askopenfilename(title="Choose a video", filetypes=filetypes)
-    root.destroy()
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Browse a video and save the frames you choose as JPG.")
+    parser.add_argument("video", nargs="?",
+                        help="video file to open (a file dialog is shown if omitted)")
+    parser.add_argument("--out", metavar="DIR",
+                        help="folder for the saved frames (default: current directory)")
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    video_path = args.video
+    if not video_path:
+        # Ask for a video with a file dialog
+        root = tk.Tk()
+        root.withdraw()  # hide the helper window
+        filetypes = [("Video files", "*.mov;*.mp4;*.avi;*.3gp")]
+        video_path = filedialog.askopenfilename(title="Choose a video", filetypes=filetypes)
+        root.destroy()
+    elif not os.path.isfile(video_path):
+        raise SystemExit(f"Video not found: {video_path}")
 
     if video_path:
-        VideoPlayer(video_path, os.path.basename(video_path))
+        VideoPlayer(video_path, os.path.basename(video_path), args.out)
 
 if __name__ == "__main__":
     main()
