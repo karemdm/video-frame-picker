@@ -9,17 +9,33 @@ Two small desktop tools (Tkinter + OpenCV + Pillow) for building image datasets 
 
 ## Installation
 
-Requires Python 3.8+ (Tkinter is included in the standard Python installers for Windows and macOS; on Linux install `python3-tk`).
+Requires Python 3.8+. Tkinter is included in the standard Python installers for Windows and macOS. On Debian/Ubuntu install it separately:
 
 ```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
+sudo apt install python3-tk
+```
 
+### Linux / macOS (bash)
+
+```bash
+git clone https://github.com/karemdm/video-frame-picker.git
+cd video-frame-picker
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/karemdm/video-frame-picker.git
+cd video-frame-picker
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell blocks the activation script, run `Set-ExecutionPolicy -Scope Process RemoteSigned` in that window first.
 
 ## video_frame_picker.py
 
