@@ -23,13 +23,8 @@ class VideoPlayer:
         self.root = tk.Tk()
         self.root.title(name_video)
 
-        # Retrieve screen resolution
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-
-        # Calculate video frame size based on screen resolution
-        self.frame_width = int(screen_width * 0.8)
-        self.frame_height = int(screen_height * 0.6)
+        # Preview size is computed for every video (see fit_size)
+        self.frame_width, self.frame_height = self.fit_size()
 
         # Create a frame to display the video
         self.video_frame = tk.Frame(self.root)
@@ -57,20 +52,6 @@ class VideoPlayer:
         self.status_label.pack(fill="x", padx=10, pady=(0, 8))
         self.saved_count = 0
 
-        # Read the first frame
-        ret, frame = self.cap.read()
-        if ret:
-            # Fit the display size to the video's aspect ratio
-            frame_ratio = frame.shape[1] / frame.shape[0]
-            window_ratio = screen_width / screen_height
-
-            if frame_ratio > window_ratio:
-                self.frame_width = int(screen_width * 0.8)
-                self.frame_height = int(self.frame_width / frame_ratio)
-            else:
-                self.frame_height = int(screen_height * 0.6)
-                self.frame_width = int(self.frame_height * frame_ratio)
-
         # Create a canvas for video display
         self.canvas = tk.Canvas(self.video_frame, width=self.frame_width, height=self.frame_height)
         self.canvas.pack()
@@ -93,6 +74,17 @@ class VideoPlayer:
 
         self.update_display()
         self.root.mainloop()
+
+    def fit_size(self):
+        # Largest size with the video's aspect ratio that fits in 80% x 60% of the screen
+        max_w = int(self.root.winfo_screenwidth() * 0.8)
+        max_h = int(self.root.winfo_screenheight() * 0.6)
+        vid_w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        vid_h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        if vid_w <= 0 or vid_h <= 0:
+            return max_w, max_h
+        scale = min(max_w / vid_w, max_h / vid_h)
+        return max(int(vid_w * scale), 1), max(int(vid_h * scale), 1)
 
     def key_pressed(self, event):
         if event.keysym == "Right":
@@ -242,6 +234,11 @@ class VideoPlayer:
             self.current_frame = 0
             self.displayed_frame = None
             self.name_video = os.path.basename(video_path)
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+
+            # Recompute the preview size for the new video and resize the canvas
+            self.frame_width, self.frame_height = self.fit_size()
+            self.canvas.config(width=self.frame_width, height=self.frame_height)
             self.update_display()
 
             # Update the window title with the new video name
