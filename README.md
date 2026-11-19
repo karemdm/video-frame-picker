@@ -7,6 +7,8 @@ Two small desktop tools (Tkinter + OpenCV + Pillow) for building image datasets 
 | `video_frame_picker.py` | Opens a video, lets you jump through frames with the keyboard, mouse wheel or scrollbar, and saves the frames you choose as JPG. |
 | `image_picker.py` | Opens a folder of images, lets you browse them and copies the ones you choose to an `output_<folder>` directory. |
 
+![demo: frames picked from a street video, then photos curated from a folder](docs/assets/demo.gif)
+
 ## How it works
 
 ```mermaid
@@ -59,6 +61,18 @@ pip install -r requirements.txt
 ```
 
 If PowerShell blocks the activation script, run `Set-ExecutionPolicy -Scope Process RemoteSigned` in that window first.
+
+## Try it with the examples
+
+The `examples/` folder has a short street video and a few photos (see [examples/README.md](examples/README.md)):
+
+```bash
+# pick frames from the video into dataset/frames
+python video_frame_picker.py examples/abbey_road_15s.mp4 --out dataset/frames
+
+# curate the photos into dataset/images
+python image_picker.py examples/street_photos --out dataset/images
+```
 
 ## video_frame_picker.py
 
