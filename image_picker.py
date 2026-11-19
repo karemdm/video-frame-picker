@@ -3,9 +3,10 @@ import os
 import shutil
 import tkinter as tk
 from tkinter import filedialog
-from PIL import Image, ImageTk
+from PIL import Image, ImageOps, ImageTk
 
 skip = 10
+PREVIEW_SIZE = (600, 400)  # preview area; images are letterboxed into it
 
 class ImageViewer:
     def __init__(self, root, input_folder, output_folder, custom_output=False):
@@ -96,9 +97,12 @@ class ImageViewer:
             self.image_name_label.config(text=f"No images found in: {self.input_folder}")
             return
         img_path = os.path.join(self.input_folder, self.images[index])
-        img = Image.open(img_path)
-        img = img.resize((600, 400))  # fixed preview size
-        img_tk = ImageTk.PhotoImage(img)
+        img = Image.open(img_path).convert("RGB")
+        # Keep the aspect ratio: fit inside the preview area and letterbox the rest
+        img = ImageOps.contain(img, PREVIEW_SIZE)
+        preview = Image.new("RGB", PREVIEW_SIZE, (32, 32, 32))
+        preview.paste(img, ((PREVIEW_SIZE[0] - img.width) // 2, (PREVIEW_SIZE[1] - img.height) // 2))
+        img_tk = ImageTk.PhotoImage(preview)
         self.image_label.config(image=img_tk)
         self.image_label.image = img_tk
 

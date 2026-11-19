@@ -40,18 +40,18 @@ If PowerShell blocks the activation script, run `Set-ExecutionPolicy -Scope Proc
 ## video_frame_picker.py
 
 ```bash
-python video_frame_picker.py [VIDEO] [--out DIR]
+python video_frame_picker.py [VIDEO] [--out DIR] [--steps A,B,C]
 ```
 
-Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`). Pass a `VIDEO` path to skip the dialog and `--out DIR` to choose the folder for the saved frames (created if missing).
+Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`). Pass a `VIDEO` path to skip the dialog and `--out DIR` to choose the folder for the saved frames (created if missing). `--steps A,B,C` sets the frame steps (default `40,200,800`): `A` for `→`/`←`, `B` for `↓`/`↑`, `C` for the mouse wheel.
 
 | Key / control | Action |
 |---|---|
-| `→` | forward 40 frames |
-| `←` | back 20 frames |
-| `↓` | forward 200 frames |
-| `↑` | back 100 frames |
-| Mouse wheel (over the video) | down: forward 800 frames, up: back 800 frames |
+| `→` | forward 40 frames (`A`) |
+| `←` | back 20 frames (`A/2`) |
+| `↓` | forward 200 frames (`B`) |
+| `↑` | back 100 frames (`B/2`) |
+| Mouse wheel (over the video) | down: forward 800 frames, up: back 800 frames (`C`) |
 | Scrollbar | seek anywhere in the video |
 | `Space`, `Enter`, `S` or **Save Frame** button | save the frame on screen |
 | `Q` | quit |
@@ -80,11 +80,9 @@ A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 | `Space`, `Enter` / **Save** | copy image to the output folder and go to the next one |
 | **Open Image Folder** | choose another folder |
 
-## Known limitations
+## Preview
 
-- Frame steps (40 / 200 / 800) are hard-coded in `VideoPlayer.__init__`.
-- The preview size is computed from the first video; a video opened later with **Open New Video** is shown at that same size.
-- `image_picker.py` shows every image at a fixed 600x400 preview (aspect ratio not preserved; the copied file is untouched).
+The video preview is sized for each opened video (aspect ratio kept, fitted to the screen). `image_picker.py` shows images in a fixed 600x400 area, letterboxed to keep their aspect ratio; the copied file is never modified.
 
 ## License
 
