@@ -10,3 +10,4 @@ Thumbs.db
 # frames/images saved by the tools
 *_frame_*.jpg
 output_*/
+dataset/

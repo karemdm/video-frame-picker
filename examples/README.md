@@ -1,0 +1,18 @@
+# Examples
+
+Small inputs for trying both tools.
+
+| File | Content |
+|---|---|
+| `abbey_road_15s.mp4` | 15 s of the Abbey Road zebra crossing in London at night (1280x720, no audio), for `video_frame_picker.py`. |
+| `street_photos/` | Six frames from public street webcams (Abbey Road, London, and the Shinjuku crossing, Tokyo), for `image_picker.py`. |
+
+## Source
+
+Captured from public live webcam streams on YouTube:
+
+- Abbey Road crossing, London: https://www.youtube.com/watch?v=zMCea32gpmg
+- Shinjuku crossing, Tokyo: https://www.youtube.com/watch?v=6dp-bvQ7RWo
+
+People appear in public spaces and are not identifiable at this resolution. The files are included only to
+demonstrate the tools. If you appear in them and want them removed, please open an issue.
