@@ -7,6 +7,29 @@ Two small desktop tools (Tkinter + OpenCV + Pillow) for building image datasets 
 | `video_frame_picker.py` | Opens a video, lets you jump through frames with the keyboard, mouse wheel or scrollbar, and saves the frames you choose as JPG. |
 | `image_picker.py` | Opens a folder of images, lets you browse them and copies the ones you choose to an `output_<folder>` directory. |
 
+## How it works
+
+```mermaid
+flowchart TD
+    A[Video file] --> B[video_frame_picker.py]
+    B --> C{Seek}
+    C -->|arrow keys| D[Frame on screen]
+    C -->|mouse wheel| D
+    C -->|scrollbar| D
+    D -->|Save: Space / Enter / S| E[JPG frames]
+    D --> C
+    E --> F[image_picker.py]
+    F --> G{Browse images}
+    G -->|Next / Back / Next 10 / Back 10| H[Image on screen]
+    H -->|Save: Space / Enter| I[Selected images copied to the output folder]
+    H --> G
+    I --> J[(Curated dataset)]
+```
+
+1. `video_frame_picker.py` opens a video; you seek with the keys, the mouse wheel or the scrollbar and save the frames you want as JPG.
+2. `image_picker.py` opens the folder with those frames (or any image folder) so you can review them one by one.
+3. The images you keep are copied to the output folder, which becomes the curated dataset.
+
 ## Installation
 
 Requires Python 3.8+. Tkinter is included in the standard Python installers for Windows and macOS. On Debian/Ubuntu install it separately:
