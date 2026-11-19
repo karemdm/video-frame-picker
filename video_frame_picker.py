@@ -7,7 +7,7 @@ import os
 from unidecode import unidecode
 
 class VideoPlayer:
-    def __init__(self, video_path, name_video, out_dir=None):
+    def __init__(self, video_path, name_video, out_dir=None, steps=(40, 200, 800)):
         self.video_path = video_path
         self.name_video = name_video
         self.out_dir = out_dir or os.getcwd()  # where saved frames go
@@ -15,8 +15,8 @@ class VideoPlayer:
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
-        self.skip_frames = 40  # Number of frames to skip when using keyboard or mouse
-        self.skip_frames_2 = 200
+        # Frame steps: small (Right/Left), medium (Down/Up), large (mouse wheel)
+        self.skip_frames, self.skip_frames_2, self.wheel_step = steps
         self.frame_skip_amount = 0
         self.displayed_frame = None  # last frame shown on the canvas (BGR, full size)
 
@@ -177,13 +177,13 @@ class VideoPlayer:
 
     def scroll_up(self, event=None):
         # Wheel up: go back
-        self.current_frame = max(0, self.current_frame - self.skip_frames_2 * 4)
+        self.current_frame = max(0, self.current_frame - self.wheel_step)
         self.update_display()
         self.update_scrollbar()
 
     def scroll_down(self, event=None):
         # Wheel down: go forward
-        self.current_frame = min(self.total_frames - 1, self.current_frame + self.skip_frames_2 * 4)
+        self.current_frame = min(self.total_frames - 1, self.current_frame + self.wheel_step)
         self.update_display()
         self.update_scrollbar()
 
@@ -245,6 +245,16 @@ class VideoPlayer:
             self.root.title(self.name_video)
 
 
+def parse_steps(text):
+    try:
+        steps = tuple(int(part) for part in text.split(","))
+    except ValueError:
+        steps = ()
+    if len(steps) != 3 or min(steps) < 2:
+        raise argparse.ArgumentTypeError("expected three integers >= 2, e.g. 40,200,800")
+    return steps
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Browse a video and save the frames you choose as JPG.")
@@ -252,6 +262,8 @@ def parse_args(argv=None):
                         help="video file to open (a file dialog is shown if omitted)")
     parser.add_argument("--out", metavar="DIR",
                         help="folder for the saved frames (default: current directory)")
+    parser.add_argument("--steps", metavar="A,B,C", type=parse_steps, default=(40, 200, 800),
+                        help="frame steps for arrows, up/down and mouse wheel (default: 40,200,800)")
     return parser.parse_args(argv)
 
 
@@ -269,7 +281,7 @@ def main(argv=None):
         raise SystemExit(f"Video not found: {video_path}")
 
     if video_path:
-        VideoPlayer(video_path, os.path.basename(video_path), args.out)
+        VideoPlayer(video_path, os.path.basename(video_path), args.out, args.steps)
 
 if __name__ == "__main__":
     main()
