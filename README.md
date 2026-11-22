@@ -104,8 +104,8 @@ A status line under the buttons confirms each save, e.g. `Saved abbey_road_15s_f
 python image_picker.py [FOLDER] [--out DIR]
 ```
 
-Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`); pass `FOLDER` to skip it.
-Selected images are copied to `--out DIR` (created if missing), or by default to `output_<folder name>` next to the input folder. Each copy is named `output_<original file name>`.
+Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tif`, `.tiff`); pass `FOLDER` to skip it.
+Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`.
 A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 | Key / button | Action |

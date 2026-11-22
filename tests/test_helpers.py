@@ -87,12 +87,12 @@ class ImagePickerHelpersTest(unittest.TestCase):
 
     def test_list_images(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for name in ("b.JPG", "a.png", "c.txt", "d.jpeg", "e.bmp", "f.tiff", "g.gif"):
+            for name in ("b.JPG", "a.png", "c.txt", "d.jpeg", "e.bmp", "f.tiff", "h.TIF", "g.gif"):
                 open(os.path.join(tmp, name), "w").close()
             os.mkdir(os.path.join(tmp, "sub.png"))  # directories are not filtered by type
             names = image_picker.list_images(tmp)
         self.assertEqual([n for n in names if n != "sub.png"],
-                         ["a.png", "b.JPG", "d.jpeg", "e.bmp", "f.tiff"])
+                         ["a.png", "b.JPG", "d.jpeg", "e.bmp", "f.tiff", "h.TIF"])
 
     def test_cli(self):
         args = image_picker.parse_args(["photos", "--out", "o"])

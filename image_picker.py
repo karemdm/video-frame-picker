@@ -9,7 +9,7 @@ from PIL import Image, ImageOps, ImageTk
 
 SKIP = 10  # images skipped by Next 10 / Back 10
 PREVIEW_SIZE = (600, 400)  # preview area; images are letterboxed into it
-IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff')
+IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')
 
 
 def list_images(folder):
@@ -41,9 +41,6 @@ class ImageViewer:
         self.custom_output = custom_output  # --out given: keep it when opening another folder
         self.images = list_images(input_folder)
         self.current_index = 0
-
-        if not os.path.exists(self.output_folder):
-            os.makedirs(self.output_folder)
 
         # Label that shows the image
         self.image_label = tk.Label(root)
@@ -141,6 +138,7 @@ class ImageViewer:
         img_path = os.path.join(self.input_folder, self.images[self.current_index])
         saved_name = output_name(self.images[self.current_index])
         output_img_path = os.path.join(self.output_folder, saved_name)
+        os.makedirs(self.output_folder, exist_ok=True)  # created on the first save
         shutil.copy(img_path, output_img_path)
         self.saved_count += 1
         self.status_label.config(
@@ -188,8 +186,6 @@ class ImageViewer:
             self.input_folder = new_folder
             if not self.custom_output:
                 self.output_folder = default_output_folder(new_folder)
-            if not os.path.exists(self.output_folder):
-                os.makedirs(self.output_folder)
             self.images = list_images(new_folder)
             self.current_index = 0
             self.show_image(self.current_index)
