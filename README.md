@@ -80,7 +80,7 @@ python image_picker.py examples/street_photos --out dataset/images
 python video_frame_picker.py [VIDEO] [--out DIR] [--steps A,B,C]
 ```
 
-Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`). Pass a `VIDEO` path to skip the dialog and `--out DIR` to choose the folder for the saved frames (created if missing). `--steps A,B,C` sets the frame steps (default `40,200,800`): `A` for `→`/`←`, `B` for `↓`/`↑`, `C` for the mouse wheel.
+Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`). Pass a `VIDEO` path to skip the dialog and `--out DIR` to choose the folder for the saved frames (created if missing). `--steps A,B,C` sets the frame steps (three integers >= 2, default `40,200,800`): `A` for `→`/`←`, `B` for `↓`/`↑`, `C` for the mouse wheel. Moving back with the arrow keys uses half of `A` or `B`; the wheel uses `C` in both directions.
 
 | Key / control | Action |
 |---|---|
@@ -95,8 +95,8 @@ Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`
 | **Open New Video** button | open another video |
 
 Frames are saved in `--out DIR` (default: the **current working directory**) as
-`<video name without accents>_frame_<n>.jpg` (`<n>` = 0-based frame index).
-A status line under the buttons confirms each save, e.g. `Saved abbey_frame_120.jpg (3 saved)`.
+`<video name, accents removed>_frame_<n>.jpg` (`<n>` = 0-based frame index).
+A status line under the buttons confirms each save, e.g. `Saved abbey_road_15s_frame_120.jpg (3 saved)`.
 
 ## image_picker.py
 
@@ -104,8 +104,8 @@ A status line under the buttons confirms each save, e.g. `Saved abbey_frame_120.
 python image_picker.py [FOLDER] [--out DIR]
 ```
 
-Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`); pass `FOLDER` to skip it.
-Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder.
+Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tif`, `.tiff`); pass `FOLDER` to skip it.
+Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`.
 A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 | Key / button | Action |
@@ -120,6 +120,14 @@ A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 ## Preview
 
 The video preview is sized for each opened video (aspect ratio kept, fitted to the screen). `image_picker.py` shows images in a fixed 600x400 area, letterboxed to keep their aspect ratio; the copied file is never modified.
+
+## Tests
+
+The pure helpers (`--steps` parsing, preview size, output file names) have standard-library tests that open no window:
+
+```bash
+python -m unittest discover -s tests
+```
 
 ## License
 
