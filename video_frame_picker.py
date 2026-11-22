@@ -255,20 +255,34 @@ class VideoPlayer:
         """Ask for another video and switch to it (the saved counter keeps counting)."""
         video_path = filedialog.askopenfilename(title="Choose a video", filetypes=VIDEO_FILETYPES)
         if video_path:
-            self.cap.release()  # Release the current video capture
-            self.cap = cv2.VideoCapture(video_path)  # Open the new video
-            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.current_frame = 0
-            self.displayed_frame = None
-            self.name_video = os.path.basename(video_path)
+            self.open_video(video_path)
 
-            # Recompute the preview size for the new video and resize the canvas
-            self.frame_width, self.frame_height = self.preview_size()
-            self.canvas.config(width=self.frame_width, height=self.frame_height)
-            self.update_display()
+    def open_video(self, video_path):
+        """Switch to the video at video_path; if it cannot be read, keep the current one."""
+        name = os.path.basename(video_path)
+        cap = cv2.VideoCapture(video_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        ok, _ = cap.read() if cap.isOpened() and total_frames > 0 else (False, None)
+        if not ok:
+            cap.release()
+            self.status_var.set(f"Could not open {name}")
+            return False
+        self.cap.release()  # Release the previous video capture
+        self.cap = cap
+        self.total_frames = total_frames
+        self.current_frame = 0
+        self.displayed_frame = None
+        self.name_video = name
 
-            # Update the window title with the new video name
-            self.root.title(self.name_video)
+        # Recompute the preview size for the new video and resize the canvas
+        self.frame_width, self.frame_height = self.preview_size()
+        self.canvas.config(width=self.frame_width, height=self.frame_height)
+        self.update_display()
+        self.status_var.set("")
+
+        # Update the window title with the new video name
+        self.root.title(self.name_video)
+        return True
 
 
 def parse_steps(text):
