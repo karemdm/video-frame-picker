@@ -1,0 +1,188 @@
+"""Tests that drive VideoPlayer with Tk events (the window is withdrawn, the main loop is not run)."""
+
+import os
+import sys
+import tempfile
+import tkinter as tk
+import unittest
+from unittest import mock
+
+import cv2
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import video_frame_picker as vfp  # noqa: E402
+
+N = 40  # frames of the synthetic clip; frame i is a flat gray of value 5 * i
+
+
+def make_clip(path, frames=N, size=(64, 48)):
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"MJPG"), 10, size)
+    for i in range(frames):
+        writer.write(np.full((size[1], size[0], 3), 5 * i, np.uint8))
+    writer.release()
+
+
+class PureLogicTest(unittest.TestCase):
+    def test_clamp_frame(self):
+        self.assertEqual(vfp.clamp_frame(-5, 10), 0)
+        self.assertEqual(vfp.clamp_frame(99, 10), 9)
+        self.assertEqual(vfp.clamp_frame(3, 10), 3)
+        self.assertEqual(vfp.clamp_frame(3, 0), 0)  # unknown frame count: never negative
+
+    def test_fraction_to_frame(self):
+        self.assertEqual(vfp.fraction_to_frame(0.0, 450), 0)
+        self.assertEqual(vfp.fraction_to_frame(1.0, 450), 449)
+        self.assertEqual(vfp.fraction_to_frame(-0.2, 450), 0)
+        self.assertEqual(vfp.fraction_to_frame(1.7, 450), 449)
+        self.assertEqual(vfp.fraction_to_frame(0.5, 1), 0)
+
+    def test_resize_frame_sizes_and_interpolation(self):
+        frame = np.zeros((100, 200, 3), np.uint8)
+        self.assertEqual(vfp.resize_frame(frame, 100, 50).shape, (50, 100, 3))
+        self.assertEqual(vfp.resize_frame(frame, 400, 200).shape, (200, 400, 3))
+        # shrinking a fine checkerboard by 2 with INTER_AREA gives the average gray, not aliasing
+        board = np.indices((100, 100)).sum(axis=0) % 2 * 255
+        board = np.dstack([board] * 3).astype(np.uint8)
+        small = vfp.resize_frame(board, 50, 50)
+        self.assertTrue(np.all(np.abs(small.astype(int) - 127) <= 1))
+
+
+class PlayerTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.clip = os.path.join(cls.tmp.name, "clip.avi")
+        make_clip(cls.clip)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.out = tempfile.TemporaryDirectory()
+        with mock.patch.object(tk.Tk, "mainloop"):
+            self.player = vfp.VideoPlayer(self.clip, "clip.avi", self.out.name, (4, 10, 20))
+        self.player.root.deiconify()  # key and wheel events need a mapped window with focus
+        self.player.root.update()
+        self.player.root.focus_force()
+        self.player.root.update()
+
+    def tearDown(self):
+        self.player.cap.release()
+        self.player.root.destroy()
+        self.out.cleanup()
+
+    def saved(self):
+        return sorted(os.listdir(self.out.name))
+
+    def test_can_read_video(self):
+        self.assertTrue(vfp.can_read_video(self.clip))
+        self.assertFalse(vfp.can_read_video(os.path.join(self.tmp.name, "missing.avi")))
+        bad = os.path.join(self.tmp.name, "bad.mp4")
+        with open(bad, "wb") as f:
+            f.write(b"not a video")
+        self.assertFalse(vfp.can_read_video(bad))
+
+    def test_saved_frame_matches_index_in_name(self):
+        p = self.player
+        for index in (0, 7, N - 1):
+            p.goto(index)
+            p.save_current_frame()
+            path = os.path.join(self.out.name, f"clip_frame_{index}.jpg")
+            img = cv2.imdecode(np.fromfile(path, np.uint8), cv2.IMREAD_COLOR)
+            self.assertLess(abs(float(img.mean()) - 5 * index), 4, index)
+
+    def test_keys_and_wheel_never_leave_range(self):
+        p = self.player
+        for _ in range(3):
+            p.root.event_generate("<Up>")
+            p.root.update()
+        p.scroll_up()
+        p.previous_frame()
+        self.assertEqual(p.current_frame, 0)
+        for _ in range(30):
+            p.scroll_down()
+        self.assertEqual(p.current_frame, N - 1)
+        p.next_frame()
+        p.medium_forward()
+        self.assertEqual(p.current_frame, N - 1)
+
+    def test_wheel_events(self):
+        p = self.player
+        p.canvas.event_generate("<MouseWheel>", delta=-120)  # Windows: down = forward
+        p.canvas.event_generate("<MouseWheel>", delta=-1)  # macOS: small deltas
+        p.root.update()
+        self.assertEqual(p.current_frame, 40 - 1)  # 2 x 20, clamped to the last frame
+        p.canvas.event_generate("<Button-4>")  # Linux wheel up
+        p.root.update()
+        self.assertEqual(p.current_frame, 19)
+
+    def test_empty_video_never_goes_negative(self):
+        p = self.player
+        p.total_frames = 0
+        p.current_frame = 0
+        p.scroll_down()
+        p.medium_forward()
+        p.next_frame()
+        self.assertEqual(p.current_frame, 0)
+
+    def test_overestimated_frame_count_keeps_name_and_image_in_sync(self):
+        p = self.player
+        p.total_frames = N + 25  # the container claims more frames than it has
+        p.goto(10)
+        p.goto(10_000)  # clamps to the (wrong) last index
+        self.assertEqual(p.total_frames, N)
+        self.assertEqual(p.current_frame, N - 1)
+        self.assertEqual(p.displayed_index, N - 1)
+        p.save_current_frame()
+        self.assertEqual(self.saved(), [f"clip_frame_{N - 1}.jpg"])
+
+    def test_scrollbar_commands(self):
+        p = self.player
+        p.scroll_video("moveto", "1.0")
+        self.assertEqual(p.current_frame, N - 1)
+        p.scroll_video("moveto", "-0.5")
+        self.assertEqual(p.current_frame, 0)
+        p.scroll_video("scroll", "1", "units")  # arrow button: one frame
+        self.assertEqual(p.current_frame, 1)
+        p.scroll_video("scroll", "1", "pages")  # click in the trough: medium step
+        self.assertEqual(p.current_frame, 11)
+        p.scroll_video("scroll", "-5", "pages")
+        self.assertEqual(p.current_frame, 0)
+
+    def test_drag_outside_the_bar_is_clamped(self):
+        p = self.player
+        p.root.update()
+        p.move_scroll(mock.Mock(x=-80))
+        self.assertEqual(p.current_frame, 0)
+        p.move_scroll(mock.Mock(x=10 ** 6))
+        self.assertEqual(p.current_frame, N - 1)
+
+    def test_upper_case_q_quits(self):
+        p = self.player
+        with mock.patch.object(p.root, "quit") as quit_mock:
+            p.root.event_generate("<Q>")
+            p.root.update()
+        quit_mock.assert_called()
+        p.cap = cv2.VideoCapture(self.clip)  # quit released it; tearDown releases again
+
+    def test_canvas_follows_real_frame_size(self):
+        p = self.player
+        p.frame_width, p.frame_height = 10, 10  # as if the reported size were wrong
+        p.update_display()
+        self.assertEqual((p.frame_width, p.frame_height), vfp.fit_size(
+            64, 48, int(p.root.winfo_screenwidth() * 0.8), int(p.root.winfo_screenheight() * 0.6)))
+        self.assertEqual(int(p.canvas.cget("width")), p.frame_width)
+
+    def test_save_in_non_ascii_folder(self):
+        p = self.player
+        p.out_dir = os.path.join(self.out.name, "ação")
+        p.save_current_frame()
+        self.assertEqual(os.listdir(p.out_dir), ["clip_frame_0.jpg"])
+        self.assertIn("Saved", p.status_var.get())
+
+
+if __name__ == "__main__":
+    unittest.main()

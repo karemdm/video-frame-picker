@@ -18,7 +18,7 @@ class SafeFilenameTest(unittest.TestCase):
         # unidecode turns the guillemets into "<<" and ">>", which Windows rejects
         name = video_frame_picker.frame_filename("«clip».mp4", 3)
         self.assertEqual(name, "__clip___frame_3.jpg")
-        for ch in '<>:"/\|?*':
+        for ch in '<>:"/' + chr(92) + '|?*':
             self.assertNotIn(ch, video_frame_picker.frame_filename("a%sb.mp4" % ch, 1))
 
     def test_empty_name_gets_fallback(self):
