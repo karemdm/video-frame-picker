@@ -89,6 +89,7 @@ class VideoPlayer:
         self.root.bind("<Right>", self.next_frame)
         self.root.bind("<Left>", self.previous_frame)
         self.root.bind("<s>", self.save_current_frame)
+        self.root.bind("<S>", self.save_current_frame)
         self.root.bind("<space>", self.save_current_frame)
         self.root.bind("<q>", self.quit)
 
@@ -121,7 +122,7 @@ class VideoPlayer:
             self.medium_forward()
         elif event.keysym == "Up":
             self.medium_backward()
-        elif event.keysym == "s":
+        elif event.keysym in ("s", "S"):
             self.save_current_frame()
         elif event.keysym == "Return" or event.keysym == "space":
             self.save_current_frame()
