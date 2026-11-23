@@ -25,3 +25,8 @@ Captured from public live webcam streams on YouTube:
 
 People appear in public spaces and are not identifiable at this resolution. The files are included only to
 demonstrate the tools. If you appear in them and want them removed, please open an issue.
+
+## Notes
+
+- `abbey_road_15s.mp4` is 15 s at 30 fps (450 frames, H.264), so the default mouse-wheel step of 800 frames jumps straight to the first or last frame of this clip; use `--steps` for smaller steps.
+- `docs/assets/demo.gif` was recorded with longer local copies of the same streams (a video named `abbey_road.mp4` and more photos), so the file names and frame numbers in the recording differ from these examples. The window layout, buttons and status lines are the same as in the current code.

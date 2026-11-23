@@ -24,9 +24,9 @@ def fit_size(vid_w, vid_h, max_w, max_h):
     return max(int(vid_w * scale), 1), max(int(vid_h * scale), 1)
 
 
-def frame_filename(name_video, frame_index):
+def frame_filename(video_name, frame_index):
     """Return the output file name for a saved frame: <video name in ASCII>_frame_<n>.jpg."""
-    base_name, _ = os.path.splitext(name_video)
+    base_name, _ = os.path.splitext(video_name)
     return f"{unidecode(base_name)}_frame_{frame_index}.jpg"
 
 
@@ -38,19 +38,19 @@ class VideoPlayer:
     Creating the object opens the window and runs the Tk main loop until it is closed.
     """
 
-    def __init__(self, video_path, name_video, out_dir=None, steps=DEFAULT_STEPS):
+    def __init__(self, video_path, video_name, out_dir=None, steps=DEFAULT_STEPS):
         self.video_path = video_path
-        self.name_video = name_video
+        self.video_name = video_name
         self.out_dir = out_dir or os.getcwd()  # where saved frames go
         self.cap = cv2.VideoCapture(video_path)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
         # Frame steps: small (Right/Left), medium (Down/Up), large (mouse wheel)
-        self.skip_frames, self.skip_frames_2, self.wheel_step = steps
+        self.small_step, self.medium_step, self.large_step = steps
         self.displayed_frame = None  # last frame shown on the canvas (BGR, full size)
 
         self.root = tk.Tk()
-        self.root.title(name_video)
+        self.root.title(video_name)
 
         # Preview size is computed for every video (see preview_size)
         self.frame_width, self.frame_height = self.preview_size()
@@ -89,6 +89,7 @@ class VideoPlayer:
         self.root.bind("<Right>", self.next_frame)
         self.root.bind("<Left>", self.previous_frame)
         self.root.bind("<s>", self.save_current_frame)
+        self.root.bind("<S>", self.save_current_frame)
         self.root.bind("<space>", self.save_current_frame)
         self.root.bind("<q>", self.quit)
 
@@ -118,10 +119,10 @@ class VideoPlayer:
         elif event.keysym == "Left":
             self.previous_frame()
         elif event.keysym == "Down":
-            self.skip_forward()
+            self.medium_forward()
         elif event.keysym == "Up":
-            self.skip_backward()
-        elif event.keysym == "s":
+            self.medium_backward()
+        elif event.keysym in ("s", "S"):
             self.save_current_frame()
         elif event.keysym == "Return" or event.keysym == "space":
             self.save_current_frame()
@@ -151,27 +152,26 @@ class VideoPlayer:
 
             self.update_scrollbar()  # Update the scrollbar position
 
-
     def next_frame(self, event=None):
         """Move forward by the small step (Right key)."""
         if self.current_frame < self.total_frames - 1:
-            self.current_frame = min(self.current_frame + self.skip_frames, self.total_frames - 1)
+            self.current_frame = min(self.current_frame + self.small_step, self.total_frames - 1)
             self.update_display()
 
     def previous_frame(self, event=None):
         """Move back by half the small step (Left key)."""
         if self.current_frame > 0:
-            self.current_frame = max(self.current_frame - self.skip_frames // 2, 0)
+            self.current_frame = max(self.current_frame - self.small_step // 2, 0)
             self.update_display()
 
-    def skip_forward(self):
+    def medium_forward(self):
         """Move forward by the medium step (Down key)."""
-        self.current_frame = min(self.current_frame + self.skip_frames_2, self.total_frames - 1)
+        self.current_frame = min(self.current_frame + self.medium_step, self.total_frames - 1)
         self.update_display()
 
-    def skip_backward(self):
+    def medium_backward(self):
         """Move back by half the medium step (Up key)."""
-        self.current_frame = max(self.current_frame - self.skip_frames_2 // 2, 0)
+        self.current_frame = max(self.current_frame - self.medium_step // 2, 0)
         self.update_display()
 
     def save_current_frame(self, event=None):
@@ -179,7 +179,7 @@ class VideoPlayer:
         # Save the frame currently on screen (not cap.read(), which would return the next frame)
         frame = self.displayed_frame
         if frame is not None:
-            filename = frame_filename(self.name_video, self.current_frame)
+            filename = frame_filename(self.video_name, self.current_frame)
             os.makedirs(self.out_dir, exist_ok=True)
             if cv2.imwrite(os.path.join(self.out_dir, filename), frame):
                 self.saved_count += 1
@@ -202,16 +202,15 @@ class VideoPlayer:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
             self.update_display()
 
-
     def scroll_up(self, event=None):
         """Wheel up: go back by the large step."""
-        self.current_frame = max(0, self.current_frame - self.wheel_step)
+        self.current_frame = max(0, self.current_frame - self.large_step)
         self.update_display()
         self.update_scrollbar()
 
     def scroll_down(self, event=None):
         """Wheel down: go forward by the large step."""
-        self.current_frame = min(self.total_frames - 1, self.current_frame + self.wheel_step)
+        self.current_frame = min(self.total_frames - 1, self.current_frame + self.large_step)
         self.update_display()
         self.update_scrollbar()
 
@@ -272,7 +271,7 @@ class VideoPlayer:
         self.total_frames = total_frames
         self.current_frame = 0
         self.displayed_frame = None
-        self.name_video = name
+        self.video_name = name
 
         # Recompute the preview size for the new video and resize the canvas
         self.frame_width, self.frame_height = self.preview_size()
@@ -281,7 +280,7 @@ class VideoPlayer:
         self.status_var.set("")
 
         # Update the window title with the new video name
-        self.root.title(self.name_video)
+        self.root.title(self.video_name)
         return True
 
 
