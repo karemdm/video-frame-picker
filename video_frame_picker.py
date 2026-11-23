@@ -29,6 +29,33 @@ def fit_size(vid_w, vid_h, max_w, max_h):
     return max(int(vid_w * scale), 1), max(int(vid_h * scale), 1)
 
 
+def clamp_frame(index, total_frames):
+    """Clamp a frame index to 0..total_frames-1 (0 when the frame count is unknown)."""
+    return max(0, min(index, total_frames - 1))
+
+
+def fraction_to_frame(fraction, total_frames):
+    """Frame index for a scrollbar position (0.0 = first frame, 1.0 = last), clamped."""
+    return clamp_frame(round(fraction * (total_frames - 1)), total_frames)
+
+
+def resize_frame(frame, width, height):
+    """Resize a frame for display: INTER_AREA when shrinking (no aliasing), bilinear when enlarging."""
+    h, w = frame.shape[:2]
+    shrinking = width < w or height < h
+    return cv2.resize(frame, (width, height),
+                      interpolation=cv2.INTER_AREA if shrinking else cv2.INTER_LINEAR)
+
+
+def can_read_video(video_path):
+    """Return True if OpenCV can open the video and decode its first frame."""
+    cap = cv2.VideoCapture(video_path)
+    try:
+        return cap.isOpened() and cap.read()[0]
+    finally:
+        cap.release()
+
+
 def frame_filename(video_name, frame_index):
     """Return the output file name for a saved frame: <video name in ASCII>_frame_<n>.jpg.
 
@@ -74,6 +101,7 @@ class VideoPlayer:
         # Frame steps: small (Right/Left), medium (Down/Up), large (mouse wheel)
         self.small_step, self.medium_step, self.large_step = steps
         self.displayed_frame = None  # last frame shown on the canvas (BGR, full size)
+        self.displayed_index = None  # index of displayed_frame (the number used in the file name)
 
         self.root = tk.Tk()
         self.root.title(video_name)
@@ -118,6 +146,8 @@ class VideoPlayer:
         self.root.bind("<S>", self.save_current_frame)
         self.root.bind("<space>", self.save_current_frame)
         self.root.bind("<q>", self.quit)
+        self.root.bind("<Q>", self.quit)
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)  # window close button
 
         # Bind mouse events
         self.canvas.bind("<Button-4>", self.scroll_up)  # Wheel up (Linux/X11)
@@ -131,12 +161,14 @@ class VideoPlayer:
         self.update_display()
         self.root.mainloop()
 
-    def preview_size(self):
-        """Preview size for the open video: its aspect ratio, fitted in 80% x 60% of the screen."""
+    def preview_size(self, vid_w=None, vid_h=None):
+        """Preview size for a video size (default: the open video's): aspect ratio kept, fitted in 80% x 60% of the screen."""
         max_w = int(self.root.winfo_screenwidth() * 0.8)
         max_h = int(self.root.winfo_screenheight() * 0.6)
-        return fit_size(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH),
-                        self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT), max_w, max_h)
+        if vid_w is None:
+            vid_w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            vid_h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        return fit_size(vid_w, vid_h, max_w, max_h)
 
     def key_pressed(self, event):
         """Handle Right/Left/Down/Up (seek) and S, Space, Enter (save) key presses."""
@@ -159,86 +191,116 @@ class VideoPlayer:
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
         ret, frame = self.cap.read()
 
-        if ret:
-            # Keep the full-size frame so "save" writes exactly what is on screen
-            self.displayed_frame = frame
-            # Resize the frame to fit the display
-            resized_frame = cv2.resize(frame, (self.frame_width, self.frame_height))
+        if not ret:
+            if self.current_frame > 0 and self.current_frame >= self.total_frames - 1:
+                # The reported frame count was too high: the video really ends before this frame
+                self.find_real_end()
+            elif self.displayed_index is not None:
+                # Unreadable frame in the middle: stay on the one that is on screen
+                self.status_var.set(f"Could not read frame {self.current_frame}")
+                self.current_frame = self.displayed_index
+                self.update_scrollbar()
+            return
 
-            # Convert the frame to PIL image format
-            image = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(image)
+        # Keep the full-size frame so "save" writes exactly what is on screen
+        self.displayed_frame = frame
+        self.displayed_index = self.current_frame
+        # Use the real frame size (rotation metadata can make it differ from the reported one)
+        size = self.preview_size(frame.shape[1], frame.shape[0])
+        if size != (self.frame_width, self.frame_height):
+            self.frame_width, self.frame_height = size
+            self.canvas.config(width=self.frame_width, height=self.frame_height)
+        # Resize the frame to fit the display
+        resized_frame = resize_frame(frame, self.frame_width, self.frame_height)
 
-            # Create a PhotoImage object
-            self.photo_image = ImageTk.PhotoImage(image)
+        # Convert the frame to PIL image format
+        image = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(image)
 
-            # Update the display
-            self.canvas.delete("all")
-            self.canvas.create_image(0, 0, anchor="nw", image=self.photo_image)
+        # Create a PhotoImage object
+        self.photo_image = ImageTk.PhotoImage(image)
 
-            self.update_scrollbar()  # Update the scrollbar position
+        # Update the display
+        self.canvas.delete("all")
+        self.canvas.create_image(0, 0, anchor="nw", image=self.photo_image)
+
+        self.update_scrollbar()  # Update the scrollbar position
+
+    def find_real_end(self):
+        """The reported frame count was too high: binary-search the last readable frame and go there."""
+        good = min(self.displayed_index or 0, self.current_frame - 1)  # a frame assumed readable
+        bad = self.current_frame  # a frame known to be unreadable
+        while bad - good > 1:
+            mid = (good + bad) // 2
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, mid)
+            if self.cap.read()[0]:
+                good = mid
+            else:
+                bad = mid
+        self.total_frames = good + 1
+        self.current_frame = good
+        self.update_display()
+
+    def goto(self, frame_index):
+        """Show frame_index, clamped to the valid range (never negative, never past the last frame)."""
+        self.current_frame = clamp_frame(frame_index, self.total_frames)
+        self.update_display()
 
     def next_frame(self, event=None):
         """Move forward by the small step (Right key)."""
-        if self.current_frame < self.total_frames - 1:
-            self.current_frame = min(self.current_frame + self.small_step, self.total_frames - 1)
-            self.update_display()
+        self.goto(self.current_frame + self.small_step)
 
     def previous_frame(self, event=None):
         """Move back by half the small step (Left key)."""
-        if self.current_frame > 0:
-            self.current_frame = max(self.current_frame - self.small_step // 2, 0)
-            self.update_display()
+        self.goto(self.current_frame - self.small_step // 2)
 
     def medium_forward(self):
         """Move forward by the medium step (Down key)."""
-        self.current_frame = min(self.current_frame + self.medium_step, self.total_frames - 1)
-        self.update_display()
+        self.goto(self.current_frame + self.medium_step)
 
     def medium_backward(self):
         """Move back by half the medium step (Up key)."""
-        self.current_frame = max(self.current_frame - self.medium_step // 2, 0)
-        self.update_display()
+        self.goto(self.current_frame - self.medium_step // 2)
 
     def save_current_frame(self, event=None):
         """Save the frame on screen as JPG in the output folder and update the status line."""
         # Save the frame currently on screen (not cap.read(), which would return the next frame)
         frame = self.displayed_frame
         if frame is not None:
-            filename = frame_filename(self.video_name, self.current_frame)
+            filename = frame_filename(self.video_name, self.displayed_index)
             os.makedirs(self.out_dir, exist_ok=True)
             if save_frame_jpg(os.path.join(self.out_dir, filename), frame):
                 self.saved_count += 1
                 self.status_var.set(f"Saved {filename} ({self.saved_count} saved)")
-                print(f"Frame {self.current_frame} saved as {filename}")
+                print(f"Frame {self.displayed_index} saved as {filename}")
             else:
                 self.status_var.set(f"Could not save {filename}")
 
     def scroll_video(self, *args):
-        """Jump to the frame that matches the scrollbar position."""
-        # Get the current scrollbar position
-        position = self.scrollbar.get()[0]
+        """Scrollbar command: jump to a position ('moveto f') or move by a unit or page ('scroll n units|pages').
 
-        # Calculate the new frame based on the scrollbar position
-        new_frame = int(position * (self.total_frames - 1))
+        With no arguments, jump to the frame that matches the current thumb position.
+        A unit (arrow button) is one frame, a page (click in the trough) is the medium step.
+        """
+        if args and args[0] == "scroll":
+            step = self.medium_step if args[2] == "pages" else 1
+            new_frame = self.current_frame + int(args[1]) * step
+        else:
+            fraction = float(args[1]) if args else self.scrollbar.get()[0]
+            new_frame = fraction_to_frame(fraction, self.total_frames)
 
         # Update the current frame only if it's different from the new frame
+        new_frame = clamp_frame(new_frame, self.total_frames)
         if new_frame != self.current_frame:
-            self.current_frame = new_frame
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
-            self.update_display()
+            self.goto(new_frame)
 
     def scroll_up(self, event=None):
         """Wheel up: go back by the large step."""
-        self.current_frame = max(0, self.current_frame - self.large_step)
-        self.update_display()
-        self.update_scrollbar()
+        self.goto(self.current_frame - self.large_step)
 
     def scroll_down(self, event=None):
         """Wheel down: go forward by the large step."""
-        self.current_frame = min(self.total_frames - 1, self.current_frame + self.large_step)
-        self.update_display()
-        self.update_scrollbar()
+        self.goto(self.current_frame + self.large_step)
 
     def scroll_mouse_wheel(self, event=None):
         """Windows/macOS wheel event: positive delta goes back, negative goes forward."""
@@ -255,9 +317,10 @@ class VideoPlayer:
 
     def move_scroll(self, event=None):
         """Scrollbar drag: move the thumb to the mouse position and seek there."""
-        position = event.x / self.scrollbar.winfo_width()
+        width = max(self.scrollbar.winfo_width(), 1)
+        position = min(max(event.x / width, 0.0), 1.0)  # dragging outside the bar stays in range
         self.scrollbar.set(position, position)
-        self.scroll_video()
+        self.scroll_video("moveto", position)
 
     def stop_scroll(self, event=None):
         """Scrollbar drag ended: restore the wheel bindings."""
@@ -297,6 +360,7 @@ class VideoPlayer:
         self.total_frames = total_frames
         self.current_frame = 0
         self.displayed_frame = None
+        self.displayed_index = None
         self.video_name = name
 
         # Recompute the preview size for the new video and resize the canvas
@@ -350,6 +414,8 @@ def main(argv=None):
         raise SystemExit(f"Video not found: {video_path}")
 
     if video_path:
+        if not can_read_video(video_path):
+            raise SystemExit(f"Could not read the video: {video_path}")
         VideoPlayer(video_path, os.path.basename(video_path), args.out, args.steps)
 
 
