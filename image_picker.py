@@ -9,7 +9,7 @@ from PIL import Image, ImageOps, ImageTk
 
 SKIP = 10  # images skipped by Next 10 / Back 10
 PREVIEW_SIZE = (600, 400)  # preview area; images are letterboxed into it
-IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 
 
 def list_images(folder):
@@ -73,7 +73,7 @@ class ImageViewer:
         elif event.keysym == "Right":
             self.next_image(event)
         elif event.keysym == "Down":
-            self.skip_10_images(event)
+            self.next_10_images(event)
 
     def create_buttons(self):
         """Create the Back 10 / Back / Save / Next / Next 10 buttons."""
@@ -105,11 +105,11 @@ class ImageViewer:
         )
         self.next_button.grid(row=0, column=3, padx=5)
 
-        self.skip_10_button = tk.Button(
-            button_frame, text="Next 10", command=self.skip_10_images,
+        self.next_10_button = tk.Button(
+            button_frame, text="Next 10", command=self.next_10_images,
             width=12, height=2, borderwidth=1, relief="solid"
         )
-        self.skip_10_button.grid(row=0, column=4, padx=5)
+        self.next_10_button.grid(row=0, column=4, padx=5)
 
     def show_image(self, index):
         """Show the image at index (letterboxed in the preview area) and its file name."""
@@ -162,7 +162,7 @@ class ImageViewer:
         else:
             print("Already at the first image.")
 
-    def skip_10_images(self, event=None):
+    def next_10_images(self, event=None):
         """Go forward 10 images (or to the last one)."""
         if self.current_index + SKIP < len(self.images):
             self.current_index += SKIP
