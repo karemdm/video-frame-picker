@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import time
 import tkinter as tk
 import unittest
 from unittest import mock
@@ -175,6 +176,60 @@ class PlayerTest(unittest.TestCase):
         self.assertEqual((p.frame_width, p.frame_height), vfp.fit_size(
             64, 48, int(p.root.winfo_screenwidth() * 0.8), int(p.root.winfo_screenheight() * 0.6)))
         self.assertEqual(int(p.canvas.cget("width")), p.frame_width)
+
+    def test_saving_never_overwrites_a_different_file(self):
+        p = self.player
+        other = os.path.join(self.out.name, "clip_frame_0.jpg")
+        with open(other, "wb") as f:  # a frame of another video with the same name
+            f.write(b"other video")
+        p.save_current_frame()
+        self.assertEqual(self.saved(), ["clip_frame_0.jpg", "clip_frame_0_2.jpg"])
+        with open(other, "rb") as f:
+            self.assertEqual(f.read(), b"other video")
+        self.assertIn("Saved clip_frame_0_2.jpg (1 saved)", p.status_var.get())
+        # the same frame again in this session keeps its name instead of creating _3
+        p.save_current_frame()
+        self.assertEqual(self.saved(), ["clip_frame_0.jpg", "clip_frame_0_2.jpg"])
+        self.assertIn("Saved clip_frame_0_2.jpg (2 saved)", p.status_var.get())
+
+    def test_same_name_from_another_video_gets_a_suffix(self):
+        p = self.player
+        p.save_current_frame()
+        copy = os.path.join(self.tmp.name, "sub")
+        os.makedirs(copy, exist_ok=True)
+        same_name = os.path.join(copy, "clip.avi")
+        make_clip(same_name)
+        self.assertTrue(p.open_video(same_name))
+        p.save_current_frame()
+        self.assertEqual(self.saved(), ["clip_frame_0.jpg", "clip_frame_0_2.jpg"])
+
+    def test_unique_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(vfp.unique_path(tmp, "a.jpg")[0], "a.jpg")
+            for name in ("a.jpg", "a_2.jpg"):
+                open(os.path.join(tmp, name), "wb").close()
+            name, path = vfp.unique_path(tmp, "a.jpg")
+            self.assertEqual((name, path), ("a_3.jpg", os.path.join(tmp, "a_3.jpg")))
+
+    def test_space_on_a_focused_button_saves_once(self):
+        p = self.player
+        for widget in (p.save_button, p.open_button, p.root):
+            for f in os.listdir(self.out.name):
+                os.remove(os.path.join(self.out.name, f))
+            p.saved_names.clear()
+            p.saved_count = 0
+            widget.focus_force()
+            p.root.update()
+            widget.event_generate("<KeyPress-space>")
+            widget.event_generate("<KeyRelease-space>")
+            p.root.update()
+            time.sleep(0.3)  # Tk invokes a focused button 100 ms after Space
+            p.root.update()
+            self.assertEqual(self.saved(), ["clip_frame_0.jpg"], widget)
+            self.assertEqual(p.saved_count, 1, widget)
+        # a click on the button still saves
+        p.save_button.invoke()
+        self.assertIn("Saved", p.status_var.get())
 
     def test_save_in_non_ascii_folder(self):
         p = self.player

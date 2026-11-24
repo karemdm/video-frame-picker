@@ -55,6 +55,16 @@ def default_output_folder(input_folder):
     return os.path.join(os.path.dirname(input_folder), f"output_{os.path.basename(input_folder)}")
 
 
+def unique_name(folder, name):
+    """Return name, or name_2, name_3, ... (before the extension) so that folder/<result> does not exist."""
+    base, ext = os.path.splitext(name)
+    candidate, n = name, 1
+    while os.path.exists(os.path.join(folder, candidate)):
+        n += 1
+        candidate = f"{base}_{n}{ext}"
+    return candidate
+
+
 def output_name(image_name):
     """Return the name a copied image gets in the output folder: output_<original name>."""
     return f"output_{image_name}"
@@ -86,6 +96,7 @@ class ImageViewer:
         self.status_label = tk.Label(root, text="", anchor="w")
         self.status_label.pack(anchor="w", padx=10)
         self.saved_count = 0
+        self.saved_names = {}  # source image path -> file name copied in this session
 
         self.create_buttons()
         self.show_image(self.current_index)
@@ -143,6 +154,13 @@ class ImageViewer:
         )
         self.next_10_button.grid(row=0, column=4, padx=5)
 
+        # Space is a window key binding (save). A focused button would also "click" on Space,
+        # saving twice, so the buttons are not focusable and swallow Space themselves.
+        for button in (self.back_10_button, self.back_button, self.save_button,
+                       self.next_button, self.next_10_button):
+            button.config(takefocus=0)
+            button.bind("<space>", self.save_image_break)
+
     def show_image(self, index):
         """Show the image at index (letterboxed in the preview area) and its file name."""
         if not self.images:
@@ -172,18 +190,30 @@ class ImageViewer:
             return
         img_path = os.path.join(self.input_folder, self.images[self.current_index])
         saved_name = output_name(self.images[self.current_index])
-        output_img_path = os.path.join(self.output_folder, saved_name)
         try:
             os.makedirs(self.output_folder, exist_ok=True)  # created on the first save
+            previous = self.saved_names.get(img_path)
+            if previous and os.path.exists(os.path.join(self.output_folder, previous)):
+                saved_name = previous  # the same image saved again in this session: keep its name
+            else:
+                # never overwrite another file: add _2, _3, ... if the name is taken
+                saved_name = unique_name(self.output_folder, saved_name)
+            output_img_path = os.path.join(self.output_folder, saved_name)
             shutil.copy(img_path, output_img_path)
         except OSError as error:
             self.status_label.config(text=f"Could not save {saved_name}: {error}")
             return
+        self.saved_names[img_path] = saved_name
         self.saved_count += 1
         self.status_label.config(
             text=f"Saved {saved_name} ({self.saved_count} saved)")
         print(f"Image saved: {output_img_path}")
         self.next_image()
+
+    def save_image_break(self, event=None):
+        """Save from a button's Space binding and stop the event, so one key press saves once."""
+        self.save_image()
+        return "break"
 
     def next_image(self, event=None):
         """Go to the next image (stays on the last one)."""

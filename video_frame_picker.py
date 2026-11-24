@@ -67,6 +67,19 @@ def frame_filename(video_name, frame_index):
     return f"{base_name}_frame_{frame_index}.jpg"
 
 
+def unique_path(folder, name):
+    """Return (name, path) for a file that does not exist yet in folder.
+
+    If folder/name is free it is used as is; otherwise _2, _3, ... is added before the extension.
+    """
+    base, ext = os.path.splitext(name)
+    candidate, n = name, 1
+    while os.path.exists(os.path.join(folder, candidate)):
+        n += 1
+        candidate = f"{base}_{n}{ext}"
+    return candidate, os.path.join(folder, candidate)
+
+
 def save_frame_jpg(path, frame, quality=JPEG_QUALITY):
     """Write a BGR frame as JPG at path; return True on success.
 
@@ -129,11 +142,18 @@ class VideoPlayer:
         self.open_button = tk.Button(self.button_frame, text="Open New Video", command=self.open_new_video)
         self.open_button.pack(side="left", padx=10)
 
+        # Space is a window key binding (save). A focused button would also "click" on Space,
+        # saving twice, so buttons are not focusable and swallow Space themselves.
+        for button in (self.save_button, self.open_button):
+            button.config(takefocus=0)
+            button.bind("<space>", self.save_current_frame_break)
+
         # Status line (shows the result of the last save)
         self.status_var = tk.StringVar(value="")
         self.status_label = tk.Label(self.root, textvariable=self.status_var, anchor="w")
         self.status_label.pack(fill="x", padx=10, pady=(0, 8))
         self.saved_count = 0
+        self.saved_names = {}  # (video path, frame index) -> file name saved in this session
 
         # Create a canvas for video display
         self.canvas = tk.Canvas(self.video_frame, width=self.frame_width, height=self.frame_height)
@@ -267,14 +287,27 @@ class VideoPlayer:
         # Save the frame currently on screen (not cap.read(), which would return the next frame)
         frame = self.displayed_frame
         if frame is not None:
+            key = (os.path.abspath(self.video_path), self.displayed_index)
             filename = frame_filename(self.video_name, self.displayed_index)
             os.makedirs(self.out_dir, exist_ok=True)
+            previous = self.saved_names.get(key)
+            if previous and os.path.exists(os.path.join(self.out_dir, previous)):
+                filename = previous  # the same frame saved again in this session: keep its name
+            else:
+                # never overwrite another file: add _2, _3, ... if the name is taken
+                filename, _ = unique_path(self.out_dir, filename)
             if save_frame_jpg(os.path.join(self.out_dir, filename), frame):
+                self.saved_names[key] = filename
                 self.saved_count += 1
                 self.status_var.set(f"Saved {filename} ({self.saved_count} saved)")
                 print(f"Frame {self.displayed_index} saved as {filename}")
             else:
                 self.status_var.set(f"Could not save {filename}")
+
+    def save_current_frame_break(self, event=None):
+        """Save from a button's Space binding and stop the event, so one key press saves once."""
+        self.save_current_frame()
+        return "break"
 
     def scroll_video(self, *args):
         """Scrollbar command: jump to a position ('moveto f') or move by a unit or page ('scroll n units|pages').
@@ -362,6 +395,7 @@ class VideoPlayer:
         self.displayed_frame = None
         self.displayed_index = None
         self.video_name = name
+        self.video_path = video_path
 
         # Recompute the preview size for the new video and resize the canvas
         self.frame_width, self.frame_height = self.preview_size()
