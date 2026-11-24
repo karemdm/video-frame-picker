@@ -1,6 +1,7 @@
 """Browse a video with the keyboard, mouse wheel or scrollbar and save chosen frames as JPG."""
 
 import argparse
+import re
 import cv2
 import tkinter as tk
 from tkinter import ttk, filedialog
@@ -11,6 +12,10 @@ from unidecode import unidecode
 DEFAULT_STEPS = (40, 200, 800)
 VIDEO_PATTERNS = ("*.mov", "*.mp4", "*.avi", "*.3gp")
 VIDEO_FILETYPES = [("Video files", VIDEO_PATTERNS)]
+JPEG_QUALITY = 95  # quality of the saved frames (OpenCV's default, made explicit)
+
+# characters not allowed in Windows file names, plus control characters
+_INVALID_FILENAME_CHARS = re.compile('[' + re.escape('<>:"/' + chr(92) + '|?*') + chr(0) + '-' + chr(31) + ']')
 
 
 def fit_size(vid_w, vid_h, max_w, max_h):
@@ -25,9 +30,30 @@ def fit_size(vid_w, vid_h, max_w, max_h):
 
 
 def frame_filename(video_name, frame_index):
-    """Return the output file name for a saved frame: <video name in ASCII>_frame_<n>.jpg."""
+    """Return the output file name for a saved frame: <video name in ASCII>_frame_<n>.jpg.
+
+    Characters that are not allowed in Windows file names (unidecode turns "«" into "<<")
+    are replaced with "_"; a name that ends up empty becomes "video".
+    """
     base_name, _ = os.path.splitext(video_name)
-    return f"{unidecode(base_name)}_frame_{frame_index}.jpg"
+    base_name = _INVALID_FILENAME_CHARS.sub("_", unidecode(base_name)).strip() or "video"
+    return f"{base_name}_frame_{frame_index}.jpg"
+
+
+def save_frame_jpg(path, frame, quality=JPEG_QUALITY):
+    """Write a BGR frame as JPG at path; return True on success.
+
+    cv2.imwrite fails silently on Windows when the path has non-ASCII characters, so the
+    image is encoded in memory and written with numpy instead.
+    """
+    ok, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        return False
+    try:
+        buffer.tofile(path)
+    except OSError:
+        return False
+    return True
 
 
 class VideoPlayer:
@@ -181,7 +207,7 @@ class VideoPlayer:
         if frame is not None:
             filename = frame_filename(self.video_name, self.current_frame)
             os.makedirs(self.out_dir, exist_ok=True)
-            if cv2.imwrite(os.path.join(self.out_dir, filename), frame):
+            if save_frame_jpg(os.path.join(self.out_dir, filename), frame):
                 self.saved_count += 1
                 self.status_var.set(f"Saved {filename} ({self.saved_count} saved)")
                 print(f"Frame {self.current_frame} saved as {filename}")
