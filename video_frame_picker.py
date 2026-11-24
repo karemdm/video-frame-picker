@@ -261,8 +261,42 @@ class VideoPlayer:
         self.current_frame = good
         self.update_display()
 
+    def extend_total(self, target):
+        """The container may report fewer frames than it has: probe forward from the reported end.
+
+        If frames past the reported count are readable, total_frames grows to the last readable
+        frame up to target (binary search), so seeking can go past the reported end. At the real
+        end the first probe fails and nothing changes.
+        """
+        good = self.total_frames - 1  # last frame known to be readable
+        if good < 0:
+            return
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, good + 1)
+        if not self.cap.read()[0]:
+            return  # really the end
+        good += 1
+        bad = target + 1  # first index we do not need to reach
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, target)
+        if self.cap.read()[0]:
+            good = target
+        else:
+            bad = target
+            while bad - good > 1:
+                mid = (good + bad) // 2
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, mid)
+                if self.cap.read()[0]:
+                    good = mid
+                else:
+                    bad = mid
+        self.total_frames = good + 1
+
     def goto(self, frame_index):
-        """Show frame_index, clamped to the valid range (never negative, never past the last frame)."""
+        """Show frame_index, clamped to the valid range (never negative, never past the last frame).
+
+        Past the reported frame count it first checks whether more frames can really be read.
+        """
+        if frame_index > self.total_frames - 1:
+            self.extend_total(frame_index)
         self.current_frame = clamp_frame(frame_index, self.total_frames)
         self.update_display()
 
