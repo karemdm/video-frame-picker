@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import time
 import tkinter as tk
 import unittest
 from unittest import mock
@@ -113,6 +114,37 @@ class ViewerTest(unittest.TestCase):
         self.assertEqual(read_bytes(copied), read_bytes(os.path.join(self.inp, "img1.png")))
         self.assertEqual(v.current_index, 1)
         self.assertIn("Saved output_img1.png (1 saved)", v.status_label.cget("text"))
+
+    def test_save_never_overwrites_a_different_file(self):
+        v = self.viewer
+        os.makedirs(self.out)
+        taken = os.path.join(self.out, "output_img1.png")
+        with open(taken, "wb") as f:  # from another folder, same file name
+            f.write(b"other")
+        v.save_image()
+        self.assertEqual(read_bytes(taken), b"other")
+        self.assertEqual(read_bytes(os.path.join(self.out, "output_img1_2.png")),
+                         read_bytes(os.path.join(self.inp, "img1.png")))
+        self.assertIn("Saved output_img1_2.png (1 saved)", v.status_label.cget("text"))
+        # the same image saved again in this session keeps its name
+        v.back_image()
+        v.save_image()
+        self.assertEqual(sorted(os.listdir(self.out)), ["output_img1.png", "output_img1_2.png"])
+        self.assertIn("Saved output_img1_2.png (2 saved)", v.status_label.cget("text"))
+
+    def test_space_on_a_focused_button_saves_once(self):
+        v = self.viewer
+        for button in (v.save_button, v.next_button, self.root):
+            button.focus_force()
+            self.root.update()
+            before = v.saved_count
+            button.event_generate("<KeyPress-space>")
+            button.event_generate("<KeyRelease-space>")
+            time.sleep(0.3)  # Tk invokes a focused button 100 ms after Space
+            self.root.update()
+            self.assertEqual(v.saved_count, before + 1, button)
+            v.current_index = 0
+            v.show_image(0)
 
     def test_corrupt_image_does_not_break_browsing_or_desync_the_name(self):
         with open(os.path.join(self.inp, "img3.png"), "wb") as f:
