@@ -231,6 +231,21 @@ class PlayerTest(unittest.TestCase):
         p.save_button.invoke()
         self.assertIn("Saved", p.status_var.get())
 
+    def test_seeking_past_an_underreported_frame_count(self):
+        p = self.player
+        p.total_frames = N - 15  # the container claims fewer frames than it has
+        p.goto(N - 5)
+        self.assertEqual(p.current_frame, N - 5)
+        self.assertEqual(p.displayed_index, N - 5)
+        self.assertEqual(p.total_frames, N - 4)
+        p.goto(10_000)  # far past the end: stops at the last readable frame
+        self.assertEqual(p.current_frame, N - 1)
+        self.assertEqual(p.total_frames, N)
+        p.next_frame()  # really the end: stays
+        self.assertEqual(p.current_frame, N - 1)
+        p.save_current_frame()
+        self.assertEqual(self.saved(), [f"clip_frame_{N - 1}.jpg"])
+
     def test_save_in_non_ascii_folder(self):
         p = self.player
         p.out_dir = os.path.join(self.out.name, "ação")
