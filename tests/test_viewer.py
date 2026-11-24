@@ -14,6 +14,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import image_picker  # noqa: E402
+from _tk import show_offscreen  # noqa: E402
 
 
 def color_at(img, x, y):
@@ -91,9 +92,9 @@ class ViewerTest(unittest.TestCase):
         for i, name in enumerate(("img1.png", "img2.png", "img10.png")):
             Image.new("RGB", (30, 20), (i * 80, 0, 0)).save(os.path.join(self.inp, name))
         self.root = tk.Tk()
-        self.root.deiconify()
+        self.root.withdraw()
         self.viewer = image_picker.ImageViewer(self.root, self.inp, self.out)
-        self.root.update()
+        show_offscreen(self.root)
 
     def tearDown(self):
         self.root.destroy()

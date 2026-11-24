@@ -14,6 +14,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import video_frame_picker as vfp  # noqa: E402
+from _tk import show_offscreen  # noqa: E402
 
 N = 40  # frames of the synthetic clip; frame i is a flat gray of value 5 * i
 
@@ -65,8 +66,7 @@ class PlayerTest(unittest.TestCase):
         self.out = tempfile.TemporaryDirectory()
         with mock.patch.object(tk.Tk, "mainloop"):
             self.player = vfp.VideoPlayer(self.clip, "clip.avi", self.out.name, (4, 10, 20))
-        self.player.root.deiconify()  # key and wheel events need a mapped window with focus
-        self.player.root.update()
+        show_offscreen(self.player.root)  # key and wheel events need a mapped window with focus
         self.player.root.focus_force()
         self.player.root.update()
 
