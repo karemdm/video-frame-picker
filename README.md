@@ -98,8 +98,9 @@ Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`
 | **Open New Video** button | open another video |
 
 Frames are saved in `--out DIR` (default: the **current working directory**) as
-`<video name, accents removed>_frame_<n>.jpg` (`<n>` = 0-based frame index of the frame on screen, JPEG quality 95). Characters Windows does not allow in file names are replaced with `_`, and folders with accents or other non-ASCII characters work. Saving the same frame of a video with the same name again overwrites the file, so use a different `--out` folder for different videos that share a file name.
-If the container reports more frames than it really has, the player finds the real last frame when you reach the end.
+`<video name, accents removed>_frame_<n>.jpg` (`<n>` = 0-based frame index of the frame on screen, JPEG quality 95). Characters Windows does not allow in file names are replaced with `_`, and folders with accents or other non-ASCII characters work. A save never overwrites a different file: if the name is already taken (for example by a frame of another video with the same file name), `_2`, `_3`, ... is added before the extension (`clip_frame_120_2.jpg`) and the status line shows the name actually used. Saving the same frame again in the same session keeps its name and rewrites that file; in a new session the same frame gets a new suffix.
+One key press saves once: the buttons are not focusable by keyboard, so `Space` never also triggers a button.
+If the container reports more frames than it really has, the player finds the real last frame when you reach the end. If it reports fewer, moving past the reported end probes forward and keeps going while frames can still be read (the scrollbar range grows accordingly).
 A status line under the buttons confirms each save, e.g. `Saved abbey_road_15s_frame_120.jpg (3 saved)`.
 
 ## image_picker.py
@@ -109,7 +110,7 @@ python image_picker.py [FOLDER] [--out DIR]
 ```
 
 Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tif`, `.tiff`); pass `FOLDER` to skip it.
-Images are listed in natural order (`frame_20` before `frame_100`, case ignored); sub-folders are skipped. Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`.
+Images are listed in natural order (`frame_20` before `frame_100`, case ignored); sub-folders are skipped. Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`; an existing file is never overwritten (a different image with the same name gets `_2`, `_3`, ... before the extension, e.g. `output_img0_2.jpg`). Saving the same image again in the same session keeps its name and rewrites that copy.
 A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 | Key / button | Action |
