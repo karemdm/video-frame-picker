@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import shutil
 import tkinter as tk
 from tkinter import filedialog
@@ -12,9 +13,40 @@ PREVIEW_SIZE = (600, 400)  # preview area; images are letterboxed into it
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 
 
+def natural_key(name):
+    """Sort key that ignores case and orders numbers by value (frame_120 before frame_1000)."""
+    parts = re.split(r"(\d+)", name.casefold())  # text, number, text, number, ...
+    return [int(part) if i % 2 else part for i, part in enumerate(parts)]
+
+
 def list_images(folder):
-    """Return the sorted names of the image files directly inside folder (by extension)."""
-    return sorted(f for f in os.listdir(folder) if f.lower().endswith(IMAGE_EXTENSIONS))
+    """Return the names of the image files directly inside folder (by extension), in natural order.
+
+    Sub-folders whose name ends like an image file are skipped.
+    """
+    names = (f for f in os.listdir(folder)
+             if f.lower().endswith(IMAGE_EXTENSIONS) and os.path.isfile(os.path.join(folder, f)))
+    return sorted(names, key=lambda f: (natural_key(f), f))
+
+
+def load_preview(path, size=PREVIEW_SIZE):
+    """Return an RGB image of exactly `size` showing the file letterboxed, as the camera saw it.
+
+    The EXIF orientation is applied (phone photos are not shown sideways), 16-bit images are
+    scaled to 8 bits and large JPEGs are decoded at reduced size. The file is not modified.
+    Raises OSError or ValueError (or PIL.Image.DecompressionBombError) for unreadable files.
+    """
+    with Image.open(path) as img:
+        img.draft("RGB", (max(size), max(size)))  # fast reduced decoding for big JPEGs
+        img = ImageOps.exif_transpose(img)
+        if img.mode.startswith("I"):  # 16/32-bit gray: convert("RGB") would clip to white
+            img = img.point(lambda v: v / 256).convert("L")
+        img = img.convert("RGB")
+    # Keep the aspect ratio: fit inside the preview area and letterbox the rest
+    img = ImageOps.contain(img, size)
+    preview = Image.new("RGB", size, (32, 32, 32))
+    preview.paste(img, ((size[0] - img.width) // 2, (size[1] - img.height) // 2))
+    return preview
 
 
 def default_output_folder(input_folder):
@@ -119,11 +151,14 @@ class ImageViewer:
             self.image_name_label.config(text=f"No images found in: {self.input_folder}")
             return
         img_path = os.path.join(self.input_folder, self.images[index])
-        img = Image.open(img_path).convert("RGB")
-        # Keep the aspect ratio: fit inside the preview area and letterbox the rest
-        img = ImageOps.contain(img, PREVIEW_SIZE)
-        preview = Image.new("RGB", PREVIEW_SIZE, (32, 32, 32))
-        preview.paste(img, ((PREVIEW_SIZE[0] - img.width) // 2, (PREVIEW_SIZE[1] - img.height) // 2))
+        try:
+            preview = load_preview(img_path)
+        except (OSError, ValueError, Image.DecompressionBombError) as error:
+            # Unreadable or corrupt file: say so, but keep browsing (and saving still copies the file)
+            self.image_label.config(image="")
+            self.image_label.image = None
+            self.image_name_label.config(text=f"Image: {self.images[index]} (cannot preview: {error})")
+            return
         img_tk = ImageTk.PhotoImage(preview)
         self.image_label.config(image=img_tk)
         self.image_label.image = img_tk
@@ -138,8 +173,12 @@ class ImageViewer:
         img_path = os.path.join(self.input_folder, self.images[self.current_index])
         saved_name = output_name(self.images[self.current_index])
         output_img_path = os.path.join(self.output_folder, saved_name)
-        os.makedirs(self.output_folder, exist_ok=True)  # created on the first save
-        shutil.copy(img_path, output_img_path)
+        try:
+            os.makedirs(self.output_folder, exist_ok=True)  # created on the first save
+            shutil.copy(img_path, output_img_path)
+        except OSError as error:
+            self.status_label.config(text=f"Could not save {saved_name}: {error}")
+            return
         self.saved_count += 1
         self.status_label.config(
             text=f"Saved {saved_name} ({self.saved_count} saved)")
@@ -183,10 +222,15 @@ class ImageViewer:
         new_folder = filedialog.askdirectory(title="Select a new image folder")
         if new_folder:
             new_folder = os.path.normpath(new_folder)
+            try:
+                images = list_images(new_folder)
+            except OSError as error:
+                self.status_label.config(text=f"Could not open {new_folder}: {error}")
+                return
             self.input_folder = new_folder
             if not self.custom_output:
                 self.output_folder = default_output_folder(new_folder)
-            self.images = list_images(new_folder)
+            self.images = images
             self.current_index = 0
             self.show_image(self.current_index)
 
@@ -194,6 +238,7 @@ class ImageViewer:
 def select_folder():
     """Ask for an image folder with a dialog; return '' or () if cancelled."""
     return filedialog.askdirectory(title="Select an image folder")
+
 
 def parse_args(argv=None):
     """Parse the command line (FOLDER, --out)."""
