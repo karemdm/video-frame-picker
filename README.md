@@ -18,13 +18,16 @@ flowchart TD
     C -->|arrow keys| D[Frame on screen]
     C -->|mouse wheel| D
     C -->|scrollbar| D
-    D -->|Save: Space / Enter / S| E[JPG frames]
     D --> C
+    D -->|Save: Space / Enter / S| E[JPG frames in --out folder]
+    D -->|Q| Z([Quit])
     E --> F[image_picker.py]
+    X[Any image folder] --> F
     F --> G{Browse images}
     G -->|Next / Back / Next 10 / Back 10| H[Image on screen]
-    H -->|Save: Space / Enter| I[Selected images copied to the output folder]
     H --> G
+    H -->|Save: Space / Enter| I[Copy to the output folder, then next image]
+    I --> G
     I --> J[(Curated dataset)]
 ```
 
@@ -89,13 +92,14 @@ Without arguments a file dialog asks for a video (`.mp4`, `.mov`, `.avi`, `.3gp`
 | `↓` | forward 200 frames (`B`) |
 | `↑` | back 100 frames (`B/2`) |
 | Mouse wheel (over the video) | down: forward 800 frames, up: back 800 frames (`C`) |
-| Scrollbar | seek anywhere in the video |
+| Scrollbar | drag to seek anywhere in the video; the arrow buttons move 1 frame, a click in the trough moves `B` frames |
 | `Space`, `Enter`, `S` or **Save Frame** button | save the frame on screen |
-| `Q` | quit |
+| `Q` (or closing the window) | quit |
 | **Open New Video** button | open another video |
 
 Frames are saved in `--out DIR` (default: the **current working directory**) as
-`<video name, accents removed>_frame_<n>.jpg` (`<n>` = 0-based frame index).
+`<video name, accents removed>_frame_<n>.jpg` (`<n>` = 0-based frame index of the frame on screen, JPEG quality 95). Characters Windows does not allow in file names are replaced with `_`, and folders with accents or other non-ASCII characters work. Saving the same frame of a video with the same name again overwrites the file, so use a different `--out` folder for different videos that share a file name.
+If the container reports more frames than it really has, the player finds the real last frame when you reach the end.
 A status line under the buttons confirms each save, e.g. `Saved abbey_road_15s_frame_120.jpg (3 saved)`.
 
 ## image_picker.py
@@ -105,7 +109,7 @@ python image_picker.py [FOLDER] [--out DIR]
 ```
 
 Without arguments a folder dialog asks for an image folder (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tif`, `.tiff`); pass `FOLDER` to skip it.
-Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`.
+Images are listed in natural order (`frame_20` before `frame_100`, case ignored); sub-folders are skipped. Selected images are copied to `--out DIR`, or by default to `output_<folder name>` next to the input folder. The output folder is created on the first save, and each copy is named `output_<original file name>`.
 A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 | Key / button | Action |
@@ -119,11 +123,11 @@ A status line shows each save, e.g. `Saved output_img0.jpg (1 saved)`.
 
 ## Preview
 
-The video preview is sized for each opened video (aspect ratio kept, fitted to the screen). `image_picker.py` shows images in a fixed 600x400 area, letterboxed to keep their aspect ratio; the copied file is never modified.
+The video preview is sized for each opened video (aspect ratio kept, fitted to the screen). `image_picker.py` shows images in a fixed 600x400 area, letterboxed to keep their aspect ratio, with the EXIF orientation applied (phone photos are not shown sideways); the copied file is never modified. A file that cannot be previewed is named on screen with the reason, and you can keep browsing.
 
 ## Tests
 
-The pure helpers (`--steps` parsing, preview size, output file names) have standard-library tests that open no window:
+The pure helpers (`--steps` parsing, preview size, file names, seeking and sorting logic) and both windows (driven with Tk events, briefly shown) have standard-library tests; they need `numpy`, which OpenCV installs:
 
 ```bash
 python -m unittest discover -s tests
